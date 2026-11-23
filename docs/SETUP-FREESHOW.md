@@ -16,4 +16,4 @@ Record the result here:
 
 | Date | FreeShow version | Windows or Mac | Result |
 |---|---|---|---|
-| | | | |
+| 23 November 2026 | Not recorded (check Help → About) | Mac | **Pass**: slide visible behind the box on the Primary output. FreeShow uses `overlay` (Transparent) mode. |

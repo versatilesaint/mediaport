@@ -763,6 +763,8 @@ The aim is to get one real graphic and one real timer onto OBS, FreeShow and Sta
 - Durable Objects work on the current plan (SQLite-backed Durable Objects are on the Workers Free plan). The $5-a-month Paid plan isn't needed unless usage passes the free daily limits.
 - `/platform` access: the Worker requires a signed-in email listed in the `PLATFORM_OWNERS` secret. Cloudflare Access is an extra, optional layer: when `ACCESS_TEAM_DOMAIN` and `ACCESS_AUD` are set, the Worker also verifies the Access token. This keeps `/platform` closed even before Access is configured.
 
+**FreeShow transparency test (23 November 2026):** passed on Mac. Transparent Website items show the slide behind them, so the FreeShow output uses `mode: overlay` (§9).
+
 **Decided in Phase 1a (23 November 2026):**
 - The MediaPort OS shell (§7.1) is the real control page at `/{org}/control`. Team and invites moved to `/{org}/team`.
 - The front end is plain ES modules served as Workers Static Assets (`apps/cloud/public/assets/`), not Vite + Preact (§3.1). The prototype was already plain JS and lighter than the Lite budget; a Preact port can come later without changing the protocol.
