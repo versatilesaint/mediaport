@@ -15,6 +15,11 @@ Read `docs/MEDIAPORT-BUILD-BRIEF.md` before changing code. Build in the phase or
 - One Durable Object room per organisation: `idFromName(org.id)`.
 - `tests/isolation.test.mjs` must pass before every merge: `npm test`.
 
+## Front end
+- `apps/cloud/public/assets/catalog.js` is the single source for templates, graphics and timer maths. The shell (`shell.js`), the displays (`display.js`) and the room (`src/room.ts`) all import it. Keep it free of DOM access at module level so the Worker can import it.
+- On-air graphics use only organisation brand tokens (`--bp --bd --ba --bf --bm --bl`), never shell theme tokens.
+- The room is the only writer of on-air state. The shell sends operations and renders snapshots.
+
 ## Security (brief §12)
 - Never commit secrets: Hub PINs, Hub tokens, display keys, Cloudflare tokens, OAuth secrets, API keys, or personal email addresses.
 - Never hard-code a Hub PIN, or put one in code, tests, docs, commit messages or config files.

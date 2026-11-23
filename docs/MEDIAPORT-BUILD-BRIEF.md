@@ -763,6 +763,13 @@ The aim is to get one real graphic and one real timer onto OBS, FreeShow and Sta
 - Durable Objects work on the current plan (SQLite-backed Durable Objects are on the Workers Free plan). The $5-a-month Paid plan isn't needed unless usage passes the free daily limits.
 - `/platform` access: the Worker requires a signed-in email listed in the `PLATFORM_OWNERS` secret. Cloudflare Access is an extra, optional layer: when `ACCESS_TEAM_DOMAIN` and `ACCESS_AUD` are set, the Worker also verifies the Access token. This keeps `/platform` closed even before Access is configured.
 
+**Decided in Phase 1a (23 November 2026):**
+- The MediaPort OS shell (§7.1) is the real control page at `/{org}/control`. Team and invites moved to `/{org}/team`.
+- The front end is plain ES modules served as Workers Static Assets (`apps/cloud/public/assets/`), not Vite + Preact (§3.1). The prototype was already plain JS and lighter than the Lite budget; a Preact port can come later without changing the protocol.
+- `catalog.js` is the single source for the 227 templates, the renderer and the timer maths. The control previews, the display outputs and the room's seeding all import it.
+- The room is server-authoritative: each operation is applied in arrival order and a fresh snapshot goes to every screen. Per-field HLC merging (§4.2) arrives with the offline Hub in Phase 3, where two writers can disagree.
+- Fonts (Fraunces, Outfit, JetBrains Mono; OFL) are self-hosted under `/assets/fonts/`. No CDN.
+
 **Still open:**
 - Email-code sign-in (needed for Phase 1b): which email-sending service to use (Resend, or an organisation's own SMTP).
 - RCCG Throne of Grace: location wording, departments, brand images and first team members.

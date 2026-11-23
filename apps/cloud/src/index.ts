@@ -6,9 +6,26 @@ import type { Env } from './env';
 import { Invites, OrgScope, Platform, Users, type Org, type User } from './db';
 import { accessOk, currentUser, devSignIn, googleCallback, googleConfigured, googleStart, isPlatformOwnerEmail, safeNext, signOut } from './auth';
 import { randomToken } from './crypto';
-import { controlPage, displayPage, freeshowTestPage, homePage, message, platformPage, signInPage } from './pages';
+import { controlPage, displayPage, freeshowTestPage, homePage, message, platformPage, shellPage, signInPage } from './pages';
+import { cleanBrand, DEFAULT_BRAND, orgProfile } from './profile';
 
 export { OverlayRoom } from './room';
+import { ASSETS } from './generated/assets';
+
+const decoded = new Map<string, Uint8Array>();
+/** Serves the bundled control-shell and display files (fonts, CSS, JS). */
+function serveAsset(req: Request, path: string): Response {
+  const a = ASSETS[path];
+  if (!a) return new Response('Not found', { status: 404 });
+  const headers = { 'content-type': a.type, etag: a.etag, 'cache-control': 'public, max-age=300, must-revalidate', 'x-content-type-options': 'nosniff' };
+  if (req.headers.get('if-none-match') === a.etag) return new Response(null, { status: 304, headers });
+  let body: string | Uint8Array = a.body;
+  if (a.b64) {
+    if (!decoded.has(path)) decoded.set(path, Uint8Array.from(atob(a.body), (c) => c.charCodeAt(0)));
+    body = decoded.get(path)!;
+  }
+  return new Response(body, { headers });
+}
 
 const json = (data: unknown, status = 200) =>
   new Response(JSON.stringify(data), { status, headers: { 'content-type': 'application/json; charset=utf-8', 'cache-control': 'no-store', 'x-content-type-options': 'nosniff' } });
@@ -67,6 +84,7 @@ export default {
 
     // ----- Public and auth -----
     if (url.pathname === '/healthz') return json({ ok: true });
+    if (url.pathname.startsWith('/assets/')) return serveAsset(req, url.pathname);
     if (url.pathname === '/') {
       const orgs = user ? await Users.orgsFor(env.DB, user.id) : [];
       return homePage(user, orgs, !!user && isPlatformOwnerEmail(env, user.email));
@@ -127,7 +145,15 @@ export default {
           shortName: clean(b.shortName, 40) || name.split(/[,(]/)[0]!.trim().slice(0, 40),
           tz,
           pack,
-          settings: { location: clean(b.location), motto: clean(b.motto), departments: [], website: clean(b.website).replace(/^https?:\/\//, ''), connectors: {} },
+          settings: {
+            location: clean(b.location),
+            motto: clean(b.motto, 200),
+            departments: Array.isArray(b.departments) ? b.departments.map((x) => clean(x, 60)).filter(Boolean).slice(0, 30) : [],
+            website: clean(b.website).replace(/^https?:\/\//, ''),
+            connectors: {},
+            brand: cleanBrand(b.brand) ?? DEFAULT_BRAND,
+            ...(clean(b.leadName) ? { lead: [clean(b.leadName), clean(b.leadTitle) || 'Add names in People'] } : {}),
+          } as never,
         });
         await Platform.audit(env.DB, user!.id, 'org.created', slug);
         let inviteUrl: string | null = null;
@@ -224,7 +250,7 @@ export default {
         const out = parts[2];
         const key = url.searchParams.get('k') || '';
         if (org.status !== 'active' || !isOutput(out) || !(await scope.displayKeyValid(out, key))) return notFound();
-        return displayPage(org, out, url.searchParams.get('debug') === '1');
+        return displayPage({ slug: org.slug, output: out, key, profile: orgProfile(org), reduceMotion: url.searchParams.get('motion') === 'reduce' }, url.searchParams.get('debug') === '1');
       }
 
       if (parts[1] === 'ws' && parts.length === 2) {
@@ -236,27 +262,36 @@ export default {
           if (!isOutput(out) || !(await scope.displayKeyValid(out, url.searchParams.get('k') || ''))) return fail(403, 'Display key not valid.');
           headers.set('x-mp-role', 'display');
           headers.set('x-mp-output', out);
-          headers.delete('x-mp-user');
-          headers.delete('x-mp-can-write');
+          for (const h of ['x-mp-user', 'x-mp-email', 'x-mp-role-name']) headers.delete(h);
         } else {
           if (!user) return fail(401, 'Sign in first.');
           const role = await scope.roleOf(user.id);
           if (!role) return fail(403, 'You are not a member of this organisation.');
           headers.set('x-mp-role', 'control');
           headers.set('x-mp-user', user.id);
-          headers.set('x-mp-can-write', roleAtLeast(role, 'operator') ? '1' : '0');
+          headers.set('x-mp-email', user.email);
+          headers.set('x-mp-role-name', role);
           headers.delete('x-mp-output');
         }
         if (req.headers.get('upgrade')?.toLowerCase() !== 'websocket') return fail(426, 'Expected a WebSocket.');
+        headers.set('x-mp-org', JSON.stringify(orgProfile(org)));
         return room(env, org).fetch(new Request(req.url, { headers }));
       }
 
-      if ((parts[1] === 'control' || parts[1] === 'dock') && parts.length === 2) {
+      if ((parts[1] === 'control' || parts[1] === 'dock' || parts[1] === 'team') && parts.length === 2) {
         if (!user) return Response.redirect(`${url.origin}/auth/signin?next=${encodeURIComponent(url.pathname)}`, 302);
         const role = await scope.roleOf(user.id);
         if (!role) return message('No access', `You're not a member of ${org.name}. Ask its owner for an invite.`, 403, user);
         if (org.status !== 'active') return message('Organisation suspended', `${org.name} is suspended. Contact the platform owner.`, 403, user);
-        return controlPage(user, org, role);
+        if (parts[1] === 'team') return controlPage(user, org, role);
+        return shellPage({
+          org: { slug: org.slug, name: org.name },
+          profile: orgProfile(org),
+          role,
+          user: { email: user.email },
+          orgs: await Users.orgsFor(env.DB, user.id),
+          isPlatformOwner: isPlatformOwnerEmail(env, user.email) && (await accessOk(req, env)),
+        });
       }
       return notFound();
     }

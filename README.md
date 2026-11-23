@@ -4,7 +4,12 @@ Live broadcast graphics for churches and organisations: 227 overlay templates fo
 
 Live: https://mediaport.koladelawal.org
 
-## Status: Phase 0
+## Status: Phase 1a in progress
+- Control room (MediaPort OS) at `/{org}/control`: 227-template library, editor, running order, speaker timer, live OBS / FreeShow / Stage previews, 30 shell themes.
+- Every change goes through the organisation's room and reaches all screens live; displays keep the last picture through network loss.
+- Team and invites at `/{org}/team`.
+
+### Phase 0
 - Cloudflare Worker with D1, R2 and a per-organisation Durable Object room.
 - Organisations, roles, invites, Google sign-in, platform admin at `/platform`.
 - Read-only display links (`/{org}/o/{obs|freeshow|stage}?k=…`) that render a transparent page, with key rotation.

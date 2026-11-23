@@ -1,6 +1,7 @@
 #!/usr/bin/env bash
 # Runs the isolation tests against a fresh local Worker (local D1, local Durable Objects). No Cloudflare account needed.
 set -euo pipefail
+node "$(dirname "$0")/build-assets.mjs"
 cd "$(dirname "$0")/../apps/cloud"
 rm -rf .wrangler/state
 # Local-only settings. ENVIRONMENT=dev enables /auth/dev on localhost; never set it in production.

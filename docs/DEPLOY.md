@@ -12,7 +12,7 @@ In the Cloudflare dashboard: Workers & Pages → `mediaport` → Settings → Bu
 - Branch: `main`
 - Root directory: `/`
 - Build command: `npm ci`
-- Deploy command: `npm run deploy`
+- Deploy command: `npm run deploy` (bundles `apps/cloud/public/assets` into the Worker, applies D1 migrations, deploys)
 
 ## Settings to add in the dashboard (Workers & Pages → mediaport → Settings → Variables and Secrets)
 | Name | Type | Value |

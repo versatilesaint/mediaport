@@ -111,7 +111,7 @@ const f=$('#invite');if(f) f.addEventListener('submit',async e=>{e.preventDefaul
 load().catch(e=>{$('#members').textContent=e.message});`;
   return page(
     `${org.name} · MediaPort`,
-    `<p class="mut mono">/${esc(org.slug)}</p><h1>${esc(org.name)}</h1><p class="mut">You're signed in as <b>${esc(role)}</b>. The full control room arrives in Phase 1.</p>
+    `<p class="mut mono">/${esc(org.slug)}</p><h1>${esc(org.name)}</h1><p class="mut">You're signed in as <b>${esc(role)}</b>. <a href="/${esc(org.slug)}/control">Open the control room</a></p>
     <h2>Team</h2><div class="card" id="members">Loading…</div>
     ${
       ['owner', 'admin'].includes(role)
@@ -163,22 +163,54 @@ load().catch(e=>{$('#orgs').textContent=e.message});`;
   );
 }
 
-/** The display page: a transparent 1920×1080 canvas. Phase 0 proves transparency and the room connection only. */
-export function displayPage(org: { slug: string }, output: string, debug: boolean) {
-  const script = `
-const qs=new URLSearchParams(location.search),k=qs.get('k')||'';const dot=document.getElementById('dot');
-let wait=500,ws;const CACHE='mp.snap.'+${JSON.stringify(org.slug + ':' + output)};
-function connect(){const proto=location.protocol==='https:'?'wss:':'ws:';ws=new WebSocket(proto+'//'+location.host+'/'+${JSON.stringify(org.slug)}+'/ws?role=display&output='+${JSON.stringify(output)}+'&k='+encodeURIComponent(k));
- ws.onopen=()=>{wait=500;if(dot)dot.dataset.s='on'};
- ws.onmessage=e=>{try{const m=JSON.parse(e.data);if(m.type==='snapshot'){try{localStorage.setItem(CACHE,JSON.stringify(m.state))}catch{}}}catch{}};
- ws.onclose=()=>{if(dot)dot.dataset.s='off';setTimeout(connect,wait);wait=Math.min(5000,wait*2)};}
-connect();`;
+/** Safe JSON for an inline <script type="application/json"> block. */
+const bootJson = (v: unknown) => JSON.stringify(v).replace(/</g, '\\u003c').replace(/\u2028/g, '\\u2028').replace(/\u2029/g, '\\u2029');
+
+const APP_CSP =
+  "default-src 'self'; script-src 'self'; style-src 'self' 'unsafe-inline'; img-src 'self' data:; font-src 'self'; connect-src 'self'; frame-ancestors 'self'; base-uri 'none'; form-action 'self'";
+
+/** The display page: a 1920×1080 canvas that follows the organisation's room. Transparent unless the output is set to full frame. */
+export function displayPage(boot: { slug: string; output: string; key: string; profile: unknown; reduceMotion: boolean }, debug: boolean) {
   return html(
-    `<!doctype html><html lang="en"><head><meta charset="utf-8"><title>MediaPort ${esc(output)}</title><style>html,body{margin:0;width:1920px;height:1080px;background:transparent;overflow:hidden}#dot{position:fixed;right:12px;top:12px;width:14px;height:14px;border-radius:50%;background:#f59e0b}#dot[data-s=on]{background:#22c55e}#dot[data-s=off]{background:#ef4444}</style></head><body>${
-      debug ? '<div id="dot" title="connection"></div>' : ''
-    }<script>${script}</script></body></html>`,
+    `<!doctype html><html lang="en"><head><meta charset="utf-8"><title>MediaPort ${esc(boot.output)}</title><link rel="stylesheet" href="/assets/graphics.css">
+<style>html,body{margin:0;width:100%;height:100%;background:transparent;overflow:hidden}
+#cv{position:absolute;left:0;top:0;width:1920px;height:1080px;transform-origin:0 0;overflow:hidden;font-family:var(--f-ui)}
+body.stage #cv{background:#000}
+body.ff #cv{background:radial-gradient(120% 90% at 85% 0%,color-mix(in srgb,var(--bm) 45%,transparent),transparent 60%),linear-gradient(160deg,var(--bp),var(--bd))}
+body.bo #cv{background:#000}body.bo #cv>*{display:none}
+#dot{position:fixed;right:12px;top:12px;width:14px;height:14px;border-radius:50%;background:#f59e0b;z-index:99}#dot[data-s=on]{background:#22c55e}#dot[data-s=off]{background:#ef4444}</style></head>
+<body><div id="cv">${boot.output === 'stage' ? '<div class="g stclk" data-static="1"><span data-kind="clock"></span></div>' : ''}</div>${debug ? '<div id="dot" title="connection"></div>' : ''}
+<script type="application/json" id="mp-boot">${bootJson(boot)}</script><script type="module" src="/assets/display.js"></script></body></html>`,
     200,
-    { 'content-security-policy': "default-src 'none'; script-src 'unsafe-inline'; style-src 'unsafe-inline'; connect-src 'self'; img-src 'self' data:; base-uri 'none'" },
+    { 'content-security-policy': APP_CSP },
+  );
+}
+
+/** The MediaPort OS control shell (brief §7.1). All data arrives over the room WebSocket after load. */
+export function shellPage(boot: unknown) {
+  return html(
+    `<!doctype html><html lang="en-GB"><head><meta charset="utf-8"><meta name="viewport" content="width=device-width,initial-scale=1,viewport-fit=cover"><title>MediaPort</title>
+<link rel="stylesheet" href="/assets/graphics.css"><link rel="stylesheet" href="/assets/shell.css"></head><body>
+<div class="wall" aria-hidden="true"><div class="blob b1"></div><div class="blob b2"></div><div class="blob b3"></div><div class="dots"></div><div class="floor"></div><div class="wm">MediaPort</div></div>
+<header class="menubar">
+  <div class="logo"><span class="mk" aria-hidden="true"></span><span class="grad">MediaPort</span></div>
+  <button class="mb-btn" id="orgBtn" data-act="org-menu" aria-haspopup="true"><span id="orgName"></span><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M6 9l6 6 6-6"/></svg></button>
+  <button class="mb-btn hide-sm" data-act="tile" title="Arrange windows"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8"><rect x="3" y="3" width="8" height="18" rx="1.5"/><rect x="13" y="3" width="8" height="8" rx="1.5"/><rect x="13" y="13" width="8" height="8" rx="1.5"/></svg><span class="hide-md">Arrange</span></button>
+  <div class="mb-sp"></div>
+  <button class="conn" id="conn" data-act="conn" data-mode="hub"><span class="dot"></span><span id="connTxt" class="hide-sm">Connecting…</span><span id="connS" class="show-sm">…</span></button>
+  <div class="mb-sp"></div>
+  <div class="avs hide-md" title="People controlling now"></div>
+  <button class="mb-btn" data-act="palette" title="Search (Ctrl K)"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><circle cx="11" cy="11" r="7"/><path d="M20 20l-3.5-3.5"/></svg><span class="hide-md mono" style="font-size:12px;opacity:.7">Ctrl K</span></button>
+  <button class="mb-btn" data-act="themes-menu" title="Theme"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8"><path d="M12 3a9 9 0 1 0 0 18c1.5 0 2-1 2-2s-1-1.5-1-2.5 1-1.5 2-1.5h2a4 4 0 0 0 4-4c0-4.4-4-8-9-8z"/><circle cx="7.5" cy="11" r="1"/><circle cx="10" cy="7" r="1"/><circle cx="15" cy="7" r="1"/></svg></button>
+  <button class="mb-btn" data-act="log" title="Activity"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8"><path d="M6 16V11a6 6 0 1 1 12 0v5l2 2H4z"/><path d="M10 20a2 2 0 0 0 4 0"/></svg></button>
+  <span class="clock hide-sm" id="clock">--:--</span>
+</header>
+<main class="desktop"><div class="area" id="area"></div></main>
+<nav class="dock" id="dock" aria-label="Apps"></nav>
+<div class="toasts" id="toasts" aria-live="polite"></div>
+<script type="application/json" id="mp-boot">${bootJson(boot)}</script><script type="module" src="/assets/shell.js"></script></body></html>`,
+    200,
+    { 'content-security-policy': APP_CSP },
   );
 }
 
