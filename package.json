@@ -1,0 +1,14 @@
+{
+  "name": "mediaport",
+  "private": true,
+  "workspaces": [
+    "apps/*",
+    "packages/*"
+  ],
+  "scripts": {
+    "test": "bash scripts/test-local.sh",
+    "typecheck": "npm run typecheck -w @mediaport/cloud",
+    "deploy": "cd apps/cloud && wrangler d1 migrations apply mediaport --remote && wrangler deploy"
+  },
+  "devDependencies": {}
+}

@@ -1,0 +1,1 @@
+{ "name": "@mediaport/core", "private": true, "type": "module", "main": "src/index.ts" }

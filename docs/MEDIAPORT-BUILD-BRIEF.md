@@ -758,6 +758,11 @@ The aim is to get one real graphic and one real timer onto OBS, FreeShow and Sta
 - Cloudflare: `koladelawal.org` is on the owner's separate personal Cloudflare account. Still to confirm in Phase 0: that its DNS is active on Cloudflare.
 - GitHub: the `mediaport` repository goes under the owner's personal GitHub account (exact username to be confirmed in Phase 0).
 
+**Answered in Phase 0 (23 November 2026):**
+- `koladelawal.org` is an active zone on the owner's personal Cloudflare account. The Worker `mediaport` is deployed on `mediaport.koladelawal.org` with D1 `mediaport`, R2 `mediaport-media` and the SQLite-backed `OverlayRoom` Durable Object.
+- Durable Objects work on the current plan (SQLite-backed Durable Objects are on the Workers Free plan). The $5-a-month Paid plan isn't needed unless usage passes the free daily limits.
+- `/platform` access: the Worker requires a signed-in email listed in the `PLATFORM_OWNERS` secret. Cloudflare Access is an extra, optional layer: when `ACCESS_TEAM_DOMAIN` and `ACCESS_AUD` are set, the Worker also verifies the Access token. This keeps `/platform` closed even before Access is configured.
+
 **Still open:**
 - Email-code sign-in (needed for Phase 1b): which email-sending service to use (Resend, or an organisation's own SMTP).
 - RCCG Throne of Grace: location wording, departments, brand images and first team members.
@@ -765,4 +770,3 @@ The aim is to get one real graphic and one real timer onto OBS, FreeShow and Sta
 - Which department names and colours to use for #210.
 - Whether FreeShow and OBS run on the same computer at Sunday services.
 - The fonts the owner prefers, if any, beyond the brand images.
-- Whether Durable Objects are on the current plan, or whether the $5 a month Workers Paid plan is approved (only if needed).

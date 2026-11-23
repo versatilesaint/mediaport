@@ -1,0 +1,18 @@
+{
+  // Must match the live Worker (brief §2). Dashboard-set vars and secrets are kept on deploy.
+  "$schema": "node_modules/wrangler/config-schema.json",
+  "name": "mediaport",
+  "main": "src/index.ts",
+  "compatibility_date": "2026-11-01",
+  "keep_vars": true,
+  "workers_dev": false,
+  "preview_urls": false,
+  "routes": [{ "pattern": "mediaport.koladelawal.org", "custom_domain": true }],
+  "d1_databases": [
+    { "binding": "DB", "database_name": "mediaport", "database_id": "7353e243-9f4c-4532-bf12-ae0cc0c30050", "migrations_dir": "migrations" }
+  ],
+  "r2_buckets": [{ "binding": "MEDIA", "bucket_name": "mediaport-media" }],
+  "durable_objects": { "bindings": [{ "name": "ROOM", "class_name": "OverlayRoom" }] },
+  "migrations": [{ "tag": "v1", "new_sqlite_classes": ["OverlayRoom"] }],
+  "observability": { "enabled": true }
+}
