@@ -193,6 +193,32 @@ single-tenant link token.
 - **D4 Phase order.** Use the merged phase list below (recommended), or finish the build brief's Phase 1b first?
 - **D5 Screen keys.** Keep keys copyable (stored as issued, as today), or hash them (links shown once, as the spec says)?
 - **D6 Preview/Take.** Add a Preview monitor with a separate Take step (spec), or keep direct Show (today)?
+- **D7 Landing navigation.** Platform / How it works / For teams / Help: sections on the home page (recommended for now) or separate pages?
+
+---
+
+## 7. MediaPort's own brand (owner uploads, 28 November 2026)
+
+Two uploads define **MediaPort the platform** (not any organisation's on-air brand). Stored in the repository:
+
+| Upload | Stored at | Use |
+|---|---|---|
+| Favicon set (`favicon.ico/.svg`, 16/32 PNG, Apple touch 180, Android 192/512, `site.webmanifest`, theme colour `#0f1e2e`) | `brand/mediaport/favicons/` | Served from the site root on every MediaPort page (home, sign-in, `/platform`, control shell, team, kit). Display pages don't need them. |
+| Logo + wordmark SVG (orange tile, "MP" mark with play triangle) | `brand/mediaport/mediaport-logo-wordmark.svg` | Header of the home page, sign-in and the shell; the favicon SVG is the navy-tile variant. |
+| Design tokens (`port-orange #e8552b/#ef6a42`, `harbour-ink #0f1e2e`, `cream #f7f4ef`, `signal-teal #167f74/#2bb5a5`, surfaces, ink, muted, hairline; Inter; type scale; radii incl. `radius-mark` 28px at 120px) | `brand/mediaport/tokens.json` | Platform/shell UI only. **Never** on-air graphics: those use each organisation's Brand Profile (repo rule). |
+| 3D landing header design ("Every clip, stream and slide. One port."; 3D extruded MP mark orbited by media cards, pointer tilt, hover pauses the orbit, Pause motion button, Open the platform / Sign in / Get started) | `docs/design/landing-header/` (design export + `preview.png`; the export's bundled React runtime is left out) | Becomes the public home page `/` for signed-out visitors. |
+
+Notes and gaps:
+- `/` today is a plain server-rendered page (`pages.ts` `homePage`) listing the user's organisations. Signed-out
+  visitors should get the new landing header; signed-in users keep their organisation list (restyled with the
+  tokens), or see the header with "Open the platform".
+- The design export runs on React. Per the repo decision (plain ES modules, small bundles) it will be rebuilt in plain
+  HTML/CSS with a small vanilla-JS module: CSS 3D for the extruded mark (stacked layers, both faces), orbiting cards
+  on a CSS animation, pointer tilt, **Pause motion** button and `prefers-reduced-motion` respected, light/dark
+  tokens, no external CDN (Inter self-hosted like the other fonts).
+- The navigation links (Platform, How it works, For teams, Help) need destinations: decide whether they are
+  sections on the home page or separate pages (decision **D7**).
+- "Sign in with Google" and "Invite-only team access" match the current auth, so no flow changes.
 
 ---
 
@@ -201,6 +227,9 @@ single-tenant link token.
 Phase 1 = "Foundation" of the studio spec, adjusted to what already exists. One commit per task, each with tests;
 `npm test` (isolation) green before every merge.
 
+0. **MediaPort platform brand**: favicons at the site root (Worker serves them; `<head>` tags and manifest on
+   every platform page); the 3D landing header rebuilt as plain HTML/CSS/JS for `/` (signed-out), organisation list
+   restyled with the MediaPort tokens (signed-in); Inter self-hosted; reduced motion and Pause motion; visual test.
 1. **Brand Profile v2** (migration `0004_brand_profile.sql`, additive): colour roles per spec (map today's six),
    fonts, `theme` (standard/sober), `motion` (full/reduced), `scripture_version`, `ccli_number`; contrast check with
    warnings; CSS custom properties `--brand-*` emitted alongside today's `--bp…` tokens (no on-air regressions).
