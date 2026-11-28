@@ -9,7 +9,9 @@ import { randomToken } from './crypto';
 import { controlPage, displayPage, freeshowTestPage, html, message, page, platformPage, shellPage, signInPage } from './pages';
 import { landingBody, sitePage } from './site';
 import { controlRoomBody, guidelinesBody, helpBody, kitsBody, platformMember, platformSignedOut } from './rooms';
-import { cleanBrand, DEFAULT_BRAND, orgProfile } from './profile';
+import { cleanBrand, DEFAULT_BRAND, orgProfile, storedKit } from './profile';
+import { cleanColors, cleanKit, contrastWarnings, LOGO_VARIANTS, type LogoVariant } from '../../../packages/core/src/brand';
+import { checkLogo } from './logo';
 
 export { OverlayRoom } from './room';
 import { ASSETS } from './generated/assets';
@@ -241,6 +243,41 @@ export default {
         await scope.audit(user!.id, 'invite.created', b.role);
         return json({ url: `${url.origin}/invite/${token}` }, 201);
       }
+      // ----- Brand Profile v2 (admin) -----
+      if (sub === 'brand' && req.method === 'GET') {
+        const p = orgProfile(scope.org);
+        return json({ colors: p.brand, kit: storedKit(scope.org), logos: p.kit?.logos ?? {}, warnings: contrastWarnings(p.brand as never), profile: p });
+      }
+      if (sub === 'brand' && req.method === 'PUT') {
+        const b = await body<{ colors?: unknown; kit?: unknown }>(req);
+        const colors = cleanColors(b.colors);
+        if (!colors) return fail(400, 'Every colour must be a hex colour like #1a2b3c.');
+        const kit = { ...cleanKit(b.kit, storedKit(scope.org)), logos: storedKit(scope.org).logos };
+        await scope.updateSettings({ brand: colors, kit });
+        await scope.audit(user!.id, 'brand.updated');
+        await room(env, scope.org).setProfile(orgProfile(scope.org));
+        return json({ ok: true, warnings: contrastWarnings(colors) });
+      }
+      if (parts[3] === 'brand' && parts[4] === 'logo' && parts.length === 6) {
+        const variant = parts[5] as LogoVariant;
+        if (!(LOGO_VARIANTS as readonly string[]).includes(variant)) return fail(400, 'Unknown logo variant.');
+        const kit = storedKit(scope.org);
+        if (req.method === 'DELETE') {
+          if (kit.logos[variant]) await env.MEDIA.delete(`orgs/${scope.org.id}/brand/${variant}-${kit.logos[variant]}`);
+          delete kit.logos[variant];
+        } else if (req.method === 'POST') {
+          const checked = checkLogo(req.headers.get('content-type') || '', new Uint8Array(await req.arrayBuffer()));
+          if ('error' in checked) return fail(400, checked.error);
+          const file = `${Date.now().toString(36)}.${checked.ext}`;
+          await env.MEDIA.put(`orgs/${scope.org.id}/brand/${variant}-${file}`, checked.bytes, { httpMetadata: { contentType: checked.type } });
+          if (kit.logos[variant]) await env.MEDIA.delete(`orgs/${scope.org.id}/brand/${variant}-${kit.logos[variant]}`);
+          kit.logos[variant] = file;
+        } else return notFound();
+        await scope.updateSettings({ kit });
+        await scope.audit(user!.id, req.method === 'DELETE' ? 'brand.logo_removed' : 'brand.logo_uploaded', variant);
+        await room(env, scope.org).setProfile(orgProfile(scope.org));
+        return json({ ok: true, logos: orgProfile(scope.org).kit?.logos ?? {} });
+      }
       if (sub === 'display-links' && req.method === 'GET') {
         const keys = await scope.displayKeys();
         const links = Object.fromEntries(OUTPUTS.map((o) => [o, `${url.origin}/${scope.org.slug}/o/${o}?k=${keys[o]}`]));
@@ -269,6 +306,18 @@ export default {
         const key = url.searchParams.get('k') || '';
         if (org.status !== 'active' || !isOutput(out) || !(await scope.displayKeyValid(out, key))) return notFound();
         return displayPage({ slug: org.slug, output: out, key, profile: orgProfile(org), reduceMotion: url.searchParams.get('motion') === 'reduce' }, url.searchParams.get('debug') === '1');
+      }
+
+      // Organisation logos (public, like any logo on a broadcast). Locked down: no scripts, even in SVG.
+      if (parts[1] === 'logo' && parts.length === 3 && (LOGO_VARIANTS as readonly string[]).includes(parts[2]!)) {
+        if (org.status !== 'active') return notFound();
+        const file = storedKit(org).logos[parts[2] as LogoVariant];
+        const obj = file ? await env.MEDIA.get(`orgs/${org.id}/brand/${parts[2]}-${file}`) : null;
+        if (!obj) return notFound();
+        return new Response(obj.body, { headers: {
+          'content-type': obj.httpMetadata?.contentType || 'application/octet-stream', 'cache-control': 'public, max-age=31536000, immutable',
+          'x-content-type-options': 'nosniff', 'content-security-policy': "default-src 'none'; style-src 'unsafe-inline'; sandbox", 'cross-origin-resource-policy': 'same-origin',
+        } });
       }
 
       if (parts[1] === 'ws' && parts.length === 2) {

@@ -6,6 +6,8 @@
 @font-face{font-family:'Outfit';font-style:normal;font-weight:500;font-display:swap;src:url(/assets/fonts/outfit-latin-500-normal.woff2) format('woff2')}
 @font-face{font-family:'Outfit';font-style:normal;font-weight:600;font-display:swap;src:url(/assets/fonts/outfit-latin-600-normal.woff2) format('woff2')}
 @font-face{font-family:'Outfit';font-style:normal;font-weight:700;font-display:swap;src:url(/assets/fonts/outfit-latin-700-normal.woff2) format('woff2')}
+@font-face{font-family:'Inter';font-style:normal;font-weight:400;font-display:swap;src:url(/assets/fonts/inter-latin-400-normal.woff2) format('woff2')}
+@font-face{font-family:'Inter';font-style:normal;font-weight:700;font-display:swap;src:url(/assets/fonts/inter-latin-700-normal.woff2) format('woff2')}
 @font-face{font-family:'JetBrains Mono';font-style:normal;font-weight:500;font-display:swap;src:url(/assets/fonts/jetbrains-mono-latin-500-normal.woff2) format('woff2')}
 @font-face{font-family:'JetBrains Mono';font-style:normal;font-weight:700;font-display:swap;src:url(/assets/fonts/jetbrains-mono-latin-700-normal.woff2) format('woff2')}
 :root{--f-display:"Fraunces",Georgia,"Times New Roman",serif;--f-ui:"Outfit",system-ui,-apple-system,"Segoe UI",sans-serif;--f-mono:"JetBrains Mono",ui-monospace,"SFMono-Regular",Consolas,monospace}
@@ -118,3 +120,13 @@
 .qr i{background:#111;border-radius:1px}
 .qr i.o{background:transparent}
 
+
+/* Brand Profile v2: uploaded logos, sober look (funerals, solemn services) and reduced motion */
+.lt .mk img{max-width:86%;max-height:86%;object-fit:contain}
+.wmk.logo img{display:block;max-width:300px;max-height:110px;object-fit:contain;filter:drop-shadow(0 6px 16px rgba(0,0,0,.5))}
+.sober{--ba:color-mix(in srgb,var(--ba) 45%,#9aa3ad);--bf:color-mix(in srgb,var(--bf) 35%,#6b7280);--bm:color-mix(in srgb,var(--bm) 35%,#6b7280)}
+.sober .sweep,.sober .bkg i{display:none}
+.sober .g{animation-duration:.9s;animation-timing-function:ease-out}
+.reduce-motion .g{animation:gFade .2s ease both!important}.reduce-motion .g.out{animation:gFadeOut .2s ease both!important}
+.reduce-motion .sweep{display:none}
+@keyframes gFade{from{opacity:0}}@keyframes gFadeOut{to{opacity:0}}

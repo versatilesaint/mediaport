@@ -222,4 +222,12 @@ export class OrgScope {
   async audit(userId: string | null, action: string, detail?: string) {
     await Platform.audit(this.db, userId, action, detail, this.id);
   }
+
+  /** Merges keys into this organisation's settings JSON (only this organisation's row). Returns the new settings. */
+  async updateSettings(patch: Record<string, unknown>): Promise<OrgSettings> {
+    const next = { ...(this.org.settings as unknown as Record<string, unknown>), ...patch } as unknown as OrgSettings;
+    await this.db.prepare('UPDATE orgs SET settings = ? WHERE id = ?').bind(JSON.stringify(next), this.id).run();
+    (this.org as { settings: OrgSettings }).settings = next;
+    return next;
+  }
 }

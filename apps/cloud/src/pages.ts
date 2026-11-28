@@ -20,8 +20,8 @@ import { headLinks, sitePage, roomHead, type RoomId } from './site';
 import { platformSignedOut } from './rooms';
 
 /** Every server-rendered page sits in the shared site frame (room bar, favicons, MediaPort tokens). */
-export function page(title: string, body: string, opts: { user?: { email: string } | null; script?: string; room?: RoomId | null } = {}): Response {
-  return html(sitePage({ title, room: opts.room ?? null, user: opts.user, body, inlineScript: opts.script }));
+export function page(title: string, body: string, opts: { user?: { email: string } | null; script?: string; room?: RoomId | null; scriptSrc?: string; css?: string[] } = {}): Response {
+  return html(sitePage({ title, room: opts.room ?? null, user: opts.user, body, inlineScript: opts.script, scriptSrc: opts.scriptSrc, css: opts.css }));
 }
 
 export function message(title: string, text: string, status = 200, user?: { email: string } | null, action?: string) {
@@ -58,10 +58,12 @@ load().catch(e=>{$('#members').textContent=e.message});`;
         ? `<h2>Invite someone</h2><form class="card grid" id="invite" style="grid-template-columns:2fr 1fr auto;align-items:end"><label>Email<input name="email" type="email" required autocomplete="off"></label><label>Role<select name="role">${(role === 'owner' ? ['admin', 'producer', 'operator', 'viewer', 'owner'] : ['producer', 'operator', 'viewer'])
             .map((r) => `<option>${r}</option>`)
             .join('')}</select></label><button class="btn pri">Create invite</button></form><p id="invout"></p>
-      <h2>Display links</h2><p class="mut">Paste each link once: OBS Browser Source, FreeShow Website item, or any screen for Stage. Links are display-only.</p><div id="links">Loading…</div>`
+      <h2>Display links</h2><p class="mut">Paste each link once: OBS Browser Source, FreeShow Website item, or any screen for Stage. Links are display-only.</p><div id="links">Loading…</div>
+      <h2 id="brand">Brand</h2><p class="mut">Your on-air look: colours, fonts, logos and the Bible version. Changes reach OBS, FreeShow and Stage straight away, without reloading them.</p>
+      <div id="brandEd" data-org="${esc(org.slug)}"><div class="card">Loading…</div></div>`
         : ''
     }`,
-    { user, script, room: 'platform' },
+    { user, script, room: 'platform', scriptSrc: ['owner', 'admin'].includes(role) ? '/assets/brand-editor.js' : undefined, css: ['owner', 'admin'].includes(role) ? ['/assets/graphics.css'] : undefined },
   );
 }
 

@@ -55,8 +55,8 @@ export const footer = () =>
   `<footer class="site-foot"><div class="in"><span>MediaPort · live graphics for churches and organisations</span><span><a href="/help">Help</a> · <a href="/guidelines">Guidelines</a></span></div></footer>`;
 
 /** A full page in a room. `body` is trusted HTML built with esc(). `inlineScript` only on pages whose CSP allows it. */
-export function sitePage(o: { title: string; room: RoomId | null; user?: SiteUser | null; body: string; inlineScript?: string; scriptSrc?: string; landing?: boolean }) {
-  return `<!doctype html><html lang="en-GB"><head><meta charset="utf-8"><meta name="viewport" content="width=device-width,initial-scale=1,viewport-fit=cover"><title>${esc(o.title)}</title>${HEAD_LINKS}<link rel="stylesheet" href="/assets/site.css"></head><body><a class="skip" href="#main">Skip to content</a>${roomBar(o.room, o.user)}${
+export function sitePage(o: { title: string; room: RoomId | null; user?: SiteUser | null; body: string; inlineScript?: string; scriptSrc?: string; landing?: boolean; css?: string[] }) {
+  return `<!doctype html><html lang="en-GB"><head><meta charset="utf-8"><meta name="viewport" content="width=device-width,initial-scale=1,viewport-fit=cover"><title>${esc(o.title)}</title>${HEAD_LINKS}<link rel="stylesheet" href="/assets/site.css">${(o.css || []).map((c) => `<link rel="stylesheet" href="${c}">`).join('')}</head><body><a class="skip" href="#main">Skip to content</a>${roomBar(o.room, o.user)}${
     o.landing ? o.body : `<main class="room" id="main">${o.body}</main>`
   }${footer()}${o.inlineScript ? `<script>${o.inlineScript}</script>` : ''}${o.scriptSrc ? `<script type="module" src="${o.scriptSrc}"></script>` : ''}</body></html>`;
 }

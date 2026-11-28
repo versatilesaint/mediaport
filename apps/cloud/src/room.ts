@@ -13,7 +13,9 @@ const OUT_IDS: OutputId[] = ['obs', 'freeshow', 'stage'];
 
 export interface OrgProfile {
   slug: string; name: string; short: string; mk: string; loc: string; motto: string; web: string;
-  depts: string[]; lead: [string, string]; brand: Record<'p' | 'd' | 'a' | 'f' | 'm' | 'l', string>; pack: string; svc: string;
+  depts: string[]; lead: [string, string]; brand: Record<'p' | 'd' | 'a' | 'f' | 'm' | 'l' | 'sl' | 'tl' | 'lv', string>; pack: string; svc: string;
+  /** Brand Profile v2: fonts, look, motion, Scripture version, CCLI, logo URLs (studio spec §2) */
+  kit?: { fonts: { heading: string; body: string; scripture: string }; theme: string; motion: string; scripture: string; ccli: string; logos: Record<string, string> };
 }
 interface Item {
   id: string; n: number; comp: string; slot: string;
@@ -112,7 +114,7 @@ export class OverlayRoom extends DurableObject<Env> {
     for (const id of ids) if (st.items[id]) items[id] = st.items[id]!;
     if (st.timerItem && st.items[st.timerItem]) items[st.timerItem] = st.items[st.timerItem]!;
     return {
-      v: 1, type: 'snapshot', profile: this.profile ? { brand: this.profile.brand, mk: this.profile.mk, short: this.profile.short, name: this.profile.name, loc: this.profile.loc } : null,
+      v: 1, type: 'snapshot', profile: this.profile ? { brand: this.profile.brand, mk: this.profile.mk, short: this.profile.short, name: this.profile.name, loc: this.profile.loc, kit: this.profile.kit } : null,
       state: { v: 1, items, onAir: { [o]: ids }, timer: st.timer, timerItem: st.timerItem, outputs: { [o]: st.outputs[o] }, updatedAt: st.updatedAt },
     };
   }

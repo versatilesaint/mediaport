@@ -1,7 +1,7 @@
 // MediaPort display output (OBS Browser Source, FreeShow Website item, Stage screen).
 // Read-only: it follows the organisation's room and never sends changes. It keeps the last picture on screen
 // through network loss (brief §4.2) and reconnects with backoff (0.5 s to 5 s).
-import { reconcile, listFor, brandVars, tmrEl, tmrPhase, tmrText, PH, fmt, clock, now } from '/assets/catalog.js';
+import { reconcile, listFor, brandVars, brandClass, tmrEl, tmrPhase, tmrText, PH, fmt, clock, now } from '/assets/catalog.js';
 
 const BOOT = JSON.parse(document.getElementById('mp-boot').textContent);
 const OUT = BOOT.output;
@@ -28,6 +28,7 @@ function render(fresh) {
   document.body.classList.toggle('ff', oc.mode === 'fullframe' && OUT !== 'stage');
   document.body.classList.toggle('bo', !!oc.blackout);
   cv.setAttribute('style', brandVars(profile) + ';' + (cv.style.transform ? 'transform:' + cv.style.transform : ''));
+  cv.className = brandClass(profile) + (BOOT.reduceMotion ? ' reduce-motion' : '');
   scale();
   if (fresh) cv.classList.add('noanim');
   reconcile(cv, oc.blackout ? [] : listFor(state, OUT, profile));

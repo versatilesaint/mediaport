@@ -331,18 +331,27 @@ export const fmt=ms=>{const s=Math.max(0,Math.ceil(ms/1000));const m=Math.floor(
 export const fmtUp=ms=>{const s=Math.max(0,Math.floor(ms/1000));const m=Math.floor(s/60);return String(m).padStart(2,'0')+':'+String(s%60).padStart(2,'0')};
 export function tmrText(t,short){const r=tmrRem(t),p=tmrPhase(t);if(p==='grace') return 'Grace '+fmt(t.graceMs+r);if(p==='overtime') return '+'+fmtUp(-r)+(short?'':' over');return fmt(r)+(short?' left':'')}
 
-export function brandVars(org){const b=org.brand;return `--bp:${b.p};--bd:${b.d};--ba:${b.a};--bf:${b.f};--bm:${b.m};--bl:${b.l}`}
+const FONT={Arial:'Arial,Helvetica,sans-serif','Arial Black':'"Arial Black",Arial,sans-serif',Georgia:'Georgia,"Times New Roman",serif',Inter:'Inter,system-ui,sans-serif',Outfit:'Outfit,system-ui,sans-serif',Fraunces:'Fraunces,Georgia,serif',Verdana:'Verdana,Geneva,sans-serif','Trebuchet MS':'"Trebuchet MS",Helvetica,sans-serif'};
+/** Brand Profile → CSS custom properties for a graphics canvas (colours, and fonts when the organisation chose them). */
+export function brandVars(org){const b=org.brand;let v=`--bp:${b.p};--bd:${b.d};--ba:${b.a};--bf:${b.f};--bm:${b.m};--bl:${b.l}`;
+  if(b.sl) v+=`;--bs:${b.sl};--bt:${b.tl};--blv:${b.lv}`;
+  const f=org.kit&&org.kit.fonts;if(f){if(FONT[f.heading]) v+=`;--f-display:${FONT[f.heading]}`;if(FONT[f.body]) v+=`;--f-ui:${FONT[f.body]}`;v+=`;--f-scripture:${FONT[f.scripture]||'var(--f-ui)'}`}
+  return v}
+/** Look and motion classes for a graphics canvas (sober theme, reduced motion). */
+export function brandClass(org){const k=org&&org.kit;return [k&&k.theme==='sober'?'sober':'',k&&k.motion==='reduced'?'reduce-motion':''].filter(Boolean).join(' ')}
+/** The organisation's logo for a dark (default) or light background, or '' when none is uploaded. */
+export function logoUrl(org,kind='mark',bg='dark'){const l=org&&org.kit&&org.kit.logos||{};const want=kind+'_'+(bg==='dark'?'light':'dark');return l[want]||l[kind+'_light']||l[(kind==='mark'?'full':'mark')+'_light']||''}
 export function qr(seed){let h=seed*2654435761>>>0,s='';for(let i=0;i<81;i++){h=(h^(h<<13))>>>0;h=(h^(h>>>17))>>>0;h=(h^(h<<5))>>>0;const r=Math.floor(i/9),c=i%9;const f=(r<3&&c<3)||(r<3&&c>5)||(r>5&&c<3);const ring=f&&!((r%6===1)&&(c%6===1));s+=`<i class="${(f?ring:(h&1))?'':'o'}"></i>`}return `<div class="qr">${s}</div>`}
 export function G(it,d,out,idx,org,st){
   const t=T(it.n),c=it.comp,full=it.slot==='fullscreen';
   const sw='<div class="sweep"></div>';
   switch(c){
-    case 'lowerThird': return ['lt',`<div class="slab"><div class="mk">${esc(org.mk)}</div><div class="tx">${sw}<div class="nm ts">${esc(d.name)}</div><div class="ti">${esc(d.title)}</div>${d.dept?`<div class="dp">${esc(d.dept)}</div>`:''}</div></div>`];
+    case 'lowerThird': return ['lt',`<div class="slab"><div class="mk">${logoUrl(org)?`<img src="${esc(logoUrl(org))}" alt="">`:esc(org.mk)}</div><div class="tx">${sw}<div class="nm ts">${esc(d.name)}</div><div class="ti">${esc(d.title)}</div>${d.dept?`<div class="dp">${esc(d.dept)}</div>`:''}</div></div>`];
     case 'lyrics': if(full) return ['full',`<div class="kk">${esc(t.n===4?'Hymn · Stanza 1':d.song)}</div><div class="verse" style="text-align:center;align-self:center">${esc(d.line1)}<br>${esc(d.line2)}</div>`];
       return ['lyl',`<div class="box">${sw}<p class="hi">${esc(d.line1)}</p><p>${esc(d.line2)}</p>${t.n===15?`<p>${esc(d.line3)}</p>`:''}</div>`];
     case 'scripture': if(full) return ['full',`<div class="kk">${esc(d.ref)} · ${esc(d.tr)}${t.n===19&&d.reader?' · Read by '+esc(d.reader):''}</div><div class="verse">${esc(d.text)}</div>`];
       if(t.n===18||t.n===39) return ['scl" style="right:auto',`<div class="box">${sw}<div class="rf" style="font-size:40px">${esc(d.ref)}</div></div>`];
-      return ['scl',`<div class="box">${sw}<div class="rf">${esc(d.ref)} · ${esc(d.tr)}</div><div class="vt ts">${esc(d.text)}</div></div>`];
+      return ['scl',`<div class="box">${sw}<div class="rf">${esc(d.ref)} · ${esc(d.tr)}</div><div class="vt ts" style="font-family:var(--f-scripture,inherit)">${esc(d.text)}</div></div>`];
     case 'title': if(full) return ['full',`<div class="kk">${esc(d.kicker)}</div><h1>${esc(d.title)}</h1><div class="bd">${esc(d.sub)}</div>`];
       return ['ttl',`<div class="box">${sw}<div class="kk">${esc(d.kicker)}</div><h2>${esc(d.title)}</h2>${d.sub?`<div class="sb">${esc(d.sub)}</div>`:''}</div>`];
     case 'points':{const ps=String(d.points||'').split('\n').filter(Boolean);const rv=+d.reveal||ps.length;
@@ -365,7 +374,7 @@ export function G(it,d,out,idx,org,st){
     case 'transition': return ['trn',`<div class="sw"></div><h2 class="ts">${esc(d.title)}</h2>`];
     case 'stage': return ['stg',`<div class="lb">${esc(t.name)}</div><div class="cur">${esc(d.current)}</div><div class="lb">Next</div><div class="nx">${esc(d.next)}</div>`];
     case 'logo': if(it.slot==='transition') return ['trn',`<div class="sw"></div><h2><span class="wmk" style="position:static;opacity:1"><span class="c" style="width:200px;height:200px;font-size:90px">${esc(org.mk)}</span></span></h2>`];
-      return ['wmk',`<span class="c">${esc(org.mk)}</span><b>${esc(org.short)}</b>`];
+      return logoUrl(org,'full')?['wmk logo',`<img src="${esc(logoUrl(org,'full'))}" alt="">`]:['wmk',`<span class="c">${esc(org.mk)}</span><b>${esc(org.short)}</b>`];
   }
   return ['',''];
 }
