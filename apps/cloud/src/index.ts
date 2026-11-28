@@ -12,6 +12,7 @@ import { controlRoomBody, guidelinesBody, helpBody, kitsBody, platformMember, pl
 import { cleanBrand, DEFAULT_BRAND, orgProfile, storedKit } from './profile';
 import { cleanColors, cleanKit, contrastWarnings, LOGO_VARIANTS, type LogoVariant } from '../../../packages/core/src/brand';
 import { checkLogo } from './logo';
+import { kitBuilderApi, kitDownload, kitStatus } from './kit';
 
 export { OverlayRoom } from './room';
 import { ASSETS } from './generated/assets';
@@ -86,6 +87,9 @@ export default {
   async fetch(req: Request, env: Env): Promise<Response> {
     const url = new URL(req.url);
     const parts = url.pathname.split('/').filter(Boolean).map(decodeURIComponent);
+    // Kit builder (GitHub Actions): bearer token, never cookies, so it sits before the same-origin check.
+    if (parts[0] === 'api' && parts[1] === 'kit-builder') return kitBuilderApi(req, env, url, parts);
+
     const user = await currentUser(req, env);
 
     if (!sameOrigin(req)) return fail(403, 'Request blocked: it did not come from this site.');
@@ -104,7 +108,16 @@ export default {
       if (orgs.length === 1 && active.length === 1) return Response.redirect(`${url.origin}/${active[0]!.slug}/control`, 302);
       return page('Control · MediaPort', controlRoomBody(orgs), { user, room: 'control' });
     }
-    if (url.pathname === '/kits') return page('Kits · MediaPort', kitsBody(user ? await Users.orgsFor(env.DB, user.id) : null), { user, room: 'kits' });
+    if (url.pathname === '/kits') {
+      if (!user) return page('Kits · MediaPort', kitsBody(null), { room: 'kits' });
+      const rows = await Users.orgsFor(env.DB, user.id);
+      const withKits = [];
+      for (const o of rows) {
+        const org = await Platform.orgBySlug(env.DB, o.slug);
+        withKits.push({ ...o, kit: org && o.status === 'active' ? await kitStatus(org) : null });
+      }
+      return page('Kits · MediaPort', kitsBody(withKits), { user, room: 'kits' });
+    }
     if (url.pathname === '/help') return page('Help · MediaPort', helpBody(), { user, room: 'help' });
     if (url.pathname === '/guidelines') return page('Guidelines · MediaPort', guidelinesBody(), { user, room: 'guidelines' });
     if (url.pathname === '/auth/signin') return signInPage(safeNext(url.searchParams.get('next')), googleConfigured(env));
@@ -221,6 +234,7 @@ export default {
       return notFound();
     }
 
+
     // ----- Organisation APIs: /api/orgs/:slug/... -----
     if (parts[0] === 'api' && parts[1] === 'orgs' && parts[2]) {
       const sub = parts.slice(3).join('/');
@@ -332,6 +346,13 @@ export default {
           'content-type': obj.httpMetadata?.contentType || 'application/octet-stream', 'cache-control': 'public, max-age=31536000, immutable',
           'x-content-type-options': 'nosniff', 'content-security-policy': "default-src 'none'; style-src 'unsafe-inline'; sandbox", 'cross-origin-resource-policy': 'same-origin',
         } });
+      }
+
+      // Kit downloads: members only.
+      if (parts[1] === 'kit' && parts.length === 3) {
+        if (!user) return Response.redirect(`${url.origin}/platform?next=/kits`, 302);
+        if (!(await scope.roleOf(user.id)) || org.status !== 'active') return notFound();
+        return kitDownload(env, org, parts[2]!);
       }
 
       if (parts[1] === 'ws' && parts.length === 2) {

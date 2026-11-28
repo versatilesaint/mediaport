@@ -1,7 +1,7 @@
 // MediaPort display output (OBS Browser Source, FreeShow Website item, Stage screen).
 // Read-only: it follows the organisation's room and never sends changes. It keeps the last picture on screen
 // through network loss (brief §4.2) and reconnects with backoff (0.5 s to 5 s).
-import { reconcile, listFor, brandVars, brandClass, tmrEl, tmrPhase, tmrText, PH, fmt, clock, now } from '/assets/catalog.js';
+import { reconcile, listFor, brandVars, brandClass, tmrEl, tmrPhase, tmrText, PH, fmt, fmtCd, clock, now } from '/assets/catalog.js';
 
 const BOOT = JSON.parse(document.getElementById('mp-boot').textContent);
 const OUT = BOOT.output;
@@ -97,7 +97,7 @@ function tick() {
   const t0 = now();
   const ck = new Date(t0).toLocaleTimeString('en-GB', { hour: '2-digit', minute: '2-digit', second: '2-digit' });
   for (const e of document.querySelectorAll('[data-kind="clock"]')) e.textContent = ck;
-  for (const e of document.querySelectorAll('[data-kind="cd"]')) { const r = +e.dataset.t - t0; e.textContent = r > 0 ? fmt(r) : 'Starting'; }
+  for (const e of document.querySelectorAll('[data-kind="cd"]')) { const r = +e.dataset.t - t0; e.textContent = r > 0 ? fmtCd(r) : 'Starting'; }
   const t = state && state.timer;
   if (!t) return;
   const ph = tmrPhase(t), used = Math.min(1, tmrEl(t) / t.durationMs);

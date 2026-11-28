@@ -2,6 +2,7 @@
 // One source for the control shell previews, the display outputs (OBS, FreeShow, Stage) and the Worker's room seeding.
 // Pure data and string functions only at module level, so the Worker can import it too.
 import qrcode from './vendor/qrcode.js';
+import { FRAME_OF, frameLayout, obsPositions } from './frames.js';
 
 export const esc=s=>String(s??'').replace(/[&<>"']/g,c=>({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#39;'}[c]));
 /** Clock synchronised with the room: every screen adds the same server offset (brief §5.2: server time, not screen time). */
@@ -236,10 +237,13 @@ Speaker Time Remaining
 2-Minute Warning Timer
 1-Minute Warning Timer
 Overtime Warning Timer
-Speaker Grace Period Timer`;
+Speaker Grace Period Timer
+Quad Multi-Camera|frame|R
+Camera + Announcement
+Camera + Countdown`;
 export const SLOTN={L:'lower',F:'fullscreen',B:'background',R:'frame',G:'badge',N:'banner',T:'ticker',A:'bar',W:'watermark',X:'transition'};
 export const SLOTZ={background:0,frame:10,fullscreen:20,lower:30,banner:40,ticker:45,bar:46,badge:50,watermark:55,transition:60};
-export const TPL=[];{let c='',s='';RAW.split('\n').forEach((ln,i)=>{const p=ln.split('|');if(p.length>1){c=p[1];s=p[2]}const n=i+1;const cat=CATS.findIndex(x=>n>=x[1]&&n<=x[2]);TPL.push({n,name:p[0],comp:c,slot:SLOTN[s],cat})})}
+export const TPL=[];{let c='',s='';RAW.split('\n').forEach((ln,i)=>{const p=ln.split('|');if(p.length>1){c=p[1];s=p[2]}const n=i+1;const cat=n>227?CATS.findIndex(x=>x[0]==='Camera overlays'):CATS.findIndex(x=>n>=x[1]&&n<=x[2]);TPL.push({n,name:p[0],comp:c,slot:SLOTN[s],cat})})}
 export const T=n=>TPL[n-1];
 export const SM={lower:'left:8%;bottom:12%;width:52%;height:17%',fullscreen:'inset:10%',background:'inset:0;opacity:.45',frame:'inset:0;background:transparent;border:2px solid var(--acc)',badge:'top:9%;right:6%;width:18%;height:14%',banner:'top:12%;left:0;right:0;height:13%',ticker:'bottom:0;left:0;right:0;height:13%',bar:'bottom:6%;left:5%;right:5%;height:10%',watermark:'bottom:9%;right:6%;width:13%;height:22%;border-radius:50%',transition:'left:32%;top:-10%;width:30%;height:120%;transform:skewX(-18deg)'};
 
@@ -281,7 +285,7 @@ export function sample(t,org){
     case 'countdown':return {label:/Pre-Service|Service/.test(nm)?'Service starts in':nm.replace(' Countdown','')+' in',minutes:/Conference/.test(nm)?90:10,at:'',weekly:''};
     case 'timer':return {label:'Speaker timer'};
     case 'clock':return {};
-    case 'frame':return {label:/Interview/.test(nm)?'Interview':/Guest Video/.test(nm)?'Guest on call':'Main camera'};
+    case 'frame':return {look:'bold',margin:'',gap:'',cam1:FRAME_OF[t.n]==='F09'?'Slides':FRAME_OF[t.n]==='F11'?'Guest':'Camera 1',cam2:FRAME_OF[t.n]==='F09'||FRAME_OF[t.n]==='F11'?'Camera 1':'Camera 2',cam3:'Camera 3',cam4:'Camera 4',name1:/Interview/.test(nm)?'Host':'',title1:'',name2:/Interview/.test(nm)?'Guest':'',title2:'',guest:/Guest/.test(nm)?org.loc||'':'',caption:'',ref:/Scripture/.test(nm)?'John 3:16 · KJV':'',heading:/Announcement/.test(nm)?'Announcement':'',text:/Scripture/.test(nm)?JN316:/Lyrics/.test(nm)?'Amazing grace! how sweet the sound,\nThat saved a wretch like me!':'',when:'',label:/Countdown/.test(nm)?'Service starts in':'',at:'',weekly:''};
     case 'background':return {caption:/Instrumental/.test(nm)?'Instrumental':''};
     case 'transition':return {title:nm};
     case 'stage':return {current:'Amazing grace! how sweet the sound,',next:'That saved a wretch like me!'};
@@ -308,8 +312,11 @@ export const FIELDS={
  ticker:[['label','Label'],['text','Items (separate with •)','ta']],
  bar:[['left','Left'],['right','Right']],
  badge:[['label','Label']],
+ frame:[['look','Look','sel:bold=Bold 3D|flat=Flat'],['margin','Outer margin (px, empty = 60)','num'],['gap','Gap between windows (px, empty = 24)','num'],['size','Small window size (% of width)','num'],['corner','Small window corner','sel:br=Bottom right|bl=Bottom left|tr=Top right|tl=Top left'],['ratio','Width of the first window (%)','num'],['side','Camera side','sel:left=Left|right=Right'],['small','Small window width (px)','num'],['band','Lyrics band height (px)','num'],
+   ['label1','Window 1 label'],['cam1','Window 1 OBS source'],['label2','Window 2 label'],['cam2','Window 2 OBS source'],['label3','Window 3 label'],['cam3','Window 3 OBS source'],['label4','Window 4 label'],['cam4','Window 4 OBS source'],
+   ['name1','Left person: name'],['title1','Left person: title'],['name2','Right person: name'],['title2','Right person: title'],['guest','Joining us from'],['caption','Caption'],['ref','Scripture reference'],['heading','Heading'],['text','Panel text (Scripture, lyrics or details)','ta'],['when','When'],['label','Countdown label'],['at','Count down to: 18:00, or 2026-12-24 18:00'],['weekly','Or the next of: Sun 10:30, Wed 19:00']],
  countdown:[['label','Label'],['minutes','Minutes from Show','num'],['at','Or count down to a time: 18:00 (today) or 2026-12-24 18:00'],['weekly','Or the next service in a weekly schedule: Sun 10:30, Wed 19:00']],
- timer:[['label','Label']],clock:[],frame:[['label','Camera label']],background:[['caption','Caption (optional)']],
+ timer:[['label','Label']],clock:[],background:[['caption','Caption (optional)']],
  transition:[['title','Title']],stage:[['current','Current'],['next','Next']],logo:[]
 };
 
@@ -352,6 +359,38 @@ export function countdownTarget(d,tz,now){tz=tz||'Europe/London';const at=String
 /** Emergency notices pre-empt everything and are only removed by Hide / Clear (studio spec §4, #18). */
 export const isEmergency=n=>/Emergency/.test(T(n)?.name||'');
 
+// ---------- Camera frames (studio spec §5; geometry in frames.js) ----------
+const FF={common:['look','margin','gap'],F01:['label1','cam1'],F02:['size','corner','label2','cam1','cam2'],F03:['label1','cam1','label2','cam2'],F04:['ratio','label1','cam1','label2','cam2'],F05:['label1','cam1','label2','cam2','label3','cam3'],
+  F06:['label1','cam1','label2','cam2','label3','cam3','label4','cam4'],F07:['ratio','side','cam1','ref','text'],F08:['band','label1','cam1','text'],F09:['small','label1','cam1','label2','cam2','caption'],F10:['cam1','cam2','name1','title1','name2','title2'],
+  F11:['small','label1','cam1','label2','cam2','guest'],F12:['cam1','caption'],F13:['cam1'],F14:['cam1'],F15:['ratio','side','cam1','heading','text','when'],F16:['ratio','side','cam1','label','at','weekly'],F17:['label1','cam1','label2','cam2','label3','cam3','label4','cam4']};
+export const frameId=n=>FRAME_OF[n]||null;
+/** The editor fields for an item: frames show only what their layout uses. */
+export function fieldsFor(it){const f=FIELDS[it.comp]||[];const id=it.comp==='frame'&&frameId(it.n);if(!id) return f;const keep=new Set([...FF.common,...FF[id]]);return f.filter(([k])=>keep.has(k))}
+export const framePositions=(it,d)=>{const id=frameId(it.n);return id?obsPositions(id,d||it.data||{}):[]};
+const rr=(h,r)=>{const k=Math.min(r,h.w/2,h.h/2);return `M${h.x+k} ${h.y}H${h.x+h.w-k}A${k} ${k} 0 0 1 ${h.x+h.w} ${h.y+k}V${h.y+h.h-k}A${k} ${k} 0 0 1 ${h.x+h.w-k} ${h.y+h.h}H${h.x+k}A${k} ${k} 0 0 1 ${h.x} ${h.y+h.h-k}V${h.y+k}A${k} ${k} 0 0 1 ${h.x+k} ${h.y}Z`};
+const at=(r,extra='')=>`left:${r.x}px;top:${r.y}px;width:${r.w}px;height:${r.h}px;${extra}`;
+function framePanel(p,d,bold){const c='fpn '+(bold?'b':'f');switch(p.kind){
+  case 'scripture':return `<div class="${c}" style="${at(p)}"><div class="fpk">${esc(d.ref||'')}</div><div class="fpt" data-fit data-min="24" style="font-family:var(--f-scripture,inherit)">${esc(chunk(d.text,420)[0])}</div></div>`;
+  case 'lyrics':{const ls=String(d.text||'').split('\n').map(x=>x.trim()).filter(Boolean).slice(0,2);return `<div class="${c}" style="${at(p)}"><div class="fpl" data-fit data-min="26">${ls.map(esc).join('<br>')}</div></div>`}
+  case 'announcement':return `<div class="${c}" style="${at(p)}"><div class="fph" data-fit data-min="28">${esc(d.heading||'')}</div>${d.text?`<div class="fpt" data-fit data-min="22">${esc(d.text)}</div>`:''}${d.when?`<div class="fpw">${esc(d.when)}</div>`:''}</div>`;
+  case 'countdown':{const tg=Number(d.target)||0;return `<div class="${c}" style="${at(p)}"><div class="fpk">${esc(d.label||'Starting in')}</div><div class="fpn-n" data-kind="cd" data-t="${tg}">--:--</div></div>`}
+  case 'guest':return d.guest?`<div class="${c}" style="${at(p)}"><div class="fpk">Joining us from</div><div class="fph" data-fit data-min="24">${esc(d.guest)}</div></div>`:'';
+  case 'caption':return d.caption?`<div class="${c}" style="${at(p)}"><div class="fph" data-fit data-min="22">${esc(d.caption)}</div></div>`:'';}return ''}
+/** A camera frame: brand-coloured panel with see-through windows, outlines, labels and panels. Brand tokens only. */
+export function frameHTML(it,d,org){const id=frameId(it.n);if(!id) return '';const L=frameLayout(id,d),bold=d.look!=='flat',rad=bold?22:10,W0=1920,H0=1080;
+  const framed=L.windows.filter(w=>!w.plain);const holes=framed.map(w=>rr(w,rad)).join(' ');let svg='';
+  if(L.backdrop) svg+=`<path fill-rule="evenodd" style="fill:${bold?'url(#fbg)':'var(--bd)'}" d="M0 0H${W0}V${H0}H0Z ${holes}"/>`+(bold?`<path fill-rule="evenodd" style="fill:url(#fgl)" d="M0 0H${W0}V${H0}H0Z ${holes}"/>`:'');
+  if(L.outline==='frame'&&!L.labelsOnly) for(const w of framed) svg+=bold?`<path d="${rr({x:w.x-9,y:w.y-9,w:w.w+18,h:w.h+18},rad+9)}" fill="none" stroke="rgba(0,0,0,.5)" stroke-width="8"/><path d="${rr({x:w.x-5,y:w.y-5,w:w.w+10,h:w.h+10},rad+5)}" fill="none" style="stroke:url(#fmt)" stroke-width="10"/><path d="${rr({x:w.x-1,y:w.y-1,w:w.w+2,h:w.h+2},rad)}" fill="none" stroke="rgba(255,255,255,.5)" stroke-width="2"/>`:`<path d="${rr({x:w.x-2,y:w.y-2,w:w.w+4,h:w.h+4},rad+2)}" fill="none" style="stroke:var(--ba)" stroke-width="4"/>`;
+  if(L.outline==='corners') for(const w of framed){const k=Math.min(140,w.w/5,w.h/5),t=bold?12:6;for(const dd of [`M${w.x} ${w.y+k}V${w.y}H${w.x+k}`,`M${w.x+w.w-k} ${w.y}H${w.x+w.w}V${w.y+k}`,`M${w.x+w.w} ${w.y+w.h-k}V${w.y+w.h}H${w.x+w.w-k}`,`M${w.x+k} ${w.y+w.h}H${w.x}V${w.y+w.h-k}`]) svg+=(bold?`<path d="${dd}" fill="none" stroke="rgba(0,0,0,.45)" stroke-width="${t+8}"/>`:'')+`<path d="${dd}" fill="none" style="stroke:${bold?'url(#fmt)':'var(--ba)'}" stroke-width="${t}" stroke-linecap="square"/>`}
+  const defs=`<defs><linearGradient id="fbg" x1="0" y1="0" x2="1" y2="1"><stop offset="0" style="stop-color:var(--bp)"/><stop offset=".55" style="stop-color:var(--bd)"/><stop offset="1" style="stop-color:var(--bm)"/></linearGradient><radialGradient id="fgl" cx=".5" cy="0" r=".9"><stop offset="0" style="stop-color:var(--ba);stop-opacity:.25"/><stop offset="1" style="stop-color:var(--ba);stop-opacity:0"/></radialGradient><linearGradient id="fmt" x1="0" y1="0" x2="0" y2="1"><stop offset="0" style="stop-color:#fff;stop-opacity:.85"/><stop offset=".3" style="stop-color:var(--ba)"/><stop offset="1" style="stop-color:var(--bf)"/></linearGradient></defs>`;
+  let html=`<svg class="fsvg" width="${W0}" height="${H0}" viewBox="0 0 ${W0} ${H0}" aria-hidden="true">${defs}${svg}</svg>`;
+  if(L.outline==='animated') for(const w of framed) html+=`<div class="fring ${bold?'b':'f'}" style="${at(w,`border-radius:${rad}px`)}"><i></i></div>`;
+  for(const p of L.panels) html+=framePanel(p,{...d,target:it.live&&it.live.target},bold);
+  if(L.names) L.windows.forEach((w,i)=>{const nm=d['name'+(i+1)],ti=d['title'+(i+1)];if(nm) html+=`<div class="flab ${bold?'b':'f'} nm" style="left:${w.x}px;top:${w.y+w.h+16}px"><b>${esc(nm)}</b>${ti?`<span>${esc(ti)}</span>`:''}</div>`});
+  else for(const w of framed) if(w.label) html+=`<div class="flab ${bold?'b':'f'}" style="left:${w.x+18}px;top:${w.y+w.h-18}px;transform:translateY(-100%)"><b>${esc(w.label)}</b></div>`;
+  if(id==='F01'&&logoUrl(org)) html+=`<img class="flogo" src="${esc(logoUrl(org,'full'))}" alt="" style="left:${L.windows[0].x+26}px;top:${L.windows[0].y+22}px">`;
+  return html}
+
 export const MULTI={badge:3,banner:2};
 
 export const tplLabel=it=>it?('#'+it.n+' '+T(it.n).name):'';
@@ -362,6 +401,8 @@ export function tmrPhase(t){if(!t.startedAt) return 'ready';const r=tmrRem(t);if
 export const PH={ready:['Ready','var(--bl)'],running:['On time','var(--bl)'],warn5:['5 minutes','#f59e0b'],warn2:['2 minutes','#f97316'],warn1:['1 minute','#ef4444'],grace:['Grace','#8b5cf6'],overtime:['Overtime','#ef4444']};
 export const PHUI={ready:'var(--acc)',running:'var(--ok)',warn5:'var(--amber)',warn2:'var(--orange)',warn1:'var(--bad)',grace:'var(--grace)',overtime:'var(--bad)'};
 export const fmt=ms=>{const s=Math.max(0,Math.ceil(ms/1000));const m=Math.floor(s/60);return m+':'+String(s%60).padStart(2,'0')};
+/** Countdown text: m:ss under an hour, h:mm:ss under a day, then "2 days 03:14:07". */
+export const fmtCd=ms=>{const s=Math.max(0,Math.ceil(ms/1000));const d=Math.floor(s/86400),h=Math.floor(s%86400/3600),m=Math.floor(s%3600/60),x=s%60,p=n=>String(n).padStart(2,'0');return d?`${d} day${d>1?'s':''} ${p(h)}:${p(m)}:${p(x)}`:h?`${h}:${p(m)}:${p(x)}`:`${m}:${p(x)}`};
 export const fmtUp=ms=>{const s=Math.max(0,Math.floor(ms/1000));const m=Math.floor(s/60);return String(m).padStart(2,'0')+':'+String(s%60).padStart(2,'0')};
 export function tmrText(t,short){const r=tmrRem(t),p=tmrPhase(t);if(p==='grace') return 'Grace '+fmt(t.graceMs+r);if(p==='overtime') return '+'+fmtUp(-r)+(short?'':' over');return fmt(r)+(short?' left':'')}
 
@@ -408,7 +449,7 @@ export function G(it,d,out,idx,org,st){
     case 'timer': if(out==='stage') return ['tms tphase',`<div class="who"><span>${esc(st.timer.label)}</span><span class="ck" data-kind="clock"></span></div><div class="v" data-kind="timer">--:--</div><div class="ph" data-kind="tph">On time</div><div class="bar"><i data-kind="tbar"></i></div>`];
       return ['tmc tphase',`<span data-kind="timer" data-short="1">--:--</span>`];
     case 'clock': return ['clk',`<span data-kind="clock"></span>`];
-    case 'frame':{const pip=/Picture|Camera \+|Split|Interview|Guest Video|Testimony Video/.test(t.name);return ['frm',`${pip?'<div class="hole" style="left:1380px;top:700px;width:480px;height:270px"></div>':''}<div class="tag"><i></i>${esc(d.label)}</div>`];}
+    case 'frame': return ['frm2',frameHTML(it,d,org)];
     case 'background': return ['bkg'+(t.n===180?' alpha':''),`<i></i><i></i><i></i>${d.caption?`<div class="cap">${esc(d.caption)}</div>`:''}`];
     case 'transition': return ['trn',`<div class="sw"></div><h2 class="ts">${esc(d.title)}</h2>`];
     case 'stage': return ['stg',`<div class="lb">${esc(t.name)}</div><div class="cur">${esc(d.current)}</div><div class="lb">Next</div><div class="nx">${esc(d.next)}</div>`];

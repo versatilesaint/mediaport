@@ -305,3 +305,17 @@ contrast warned ✔.
 | Tests | `tests/phase2.test.mjs` (paging, roles, passage split, countdowns incl. BST, emergency, presence); 42 tests pass |
 
 Still to do in later phases: per-template layouts for the remaining generic templates, 09–16 refinements, sober theme for every graphic (Phase 5), camera frames and generated assets (Phase 3), kit (Phase 4), Link agent (Phase 5).
+
+## Phase 3: camera frames and generated brand assets (done)
+
+| Spec item | Result |
+|---|---|
+| 17 camera frames (§5) | `apps/cloud/public/assets/frames.js`: shared geometry for the renderer, the studio, the Worker and the tests. Default geometry matches the §5 table exactly; margin, gap, ratio, size, corner, side and band recompute every window. #228 Quad, #229 Camera + Announcement, #230 Camera + Countdown added to Camera overlays |
+| Bold / Flat looks | Brand tokens only; evenodd SVG backdrop with real see-through windows; animated live border; corners; camera IDs |
+| OBS positions | The editor shows each camera's position and size with copy buttons |
+| Generated assets (§6) | `kit/scenes.html` and `kit/frames.html` render in the organisation's brand; `kit/build.mjs` captures with Playwright and encodes VP9 with alpha via ffmpeg: motion backgrounds (standard, dark; 20 s), stills (welcome, lyrics, Scripture, announcement, sermon; 1080p and 4K), intro sting (7 s), transition stinger (2.5 s, cut at 1.2 s), corner logo (12 s loop + PNG), lower third (8 s loop + PNG, no text), 34 frame PNGs, animated border WebM, `kit.json` with OBS positions. Sober theme: no rays or sparks; reduced motion: short fades |
+| Free hosting | GitHub Actions (`.github/workflows/kit-build.yml`, hourly + manual) renders; the Worker stores files in R2 under `orgs/{orgId}/kit/{brandHash}/`; a brand change makes a new hash, so the kit is rebuilt and the old one removed |
+| Security | `/api/kit-builder/*` needs the `KIT_BUILD_TOKEN` bearer secret (32+ characters, constant-time compare); downloads are members only; other organisations get 404 |
+| Tests | `tests/frames.test.mjs`, `tests/kit.test.mjs`; builder run end to end against a local Worker (55 files) |
+
+Owner action: set `KIT_BUILD_TOKEN` (any random 32+ character value) as a Worker secret (`npx wrangler secret put KIT_BUILD_TOKEN` in `apps/cloud`) and as a GitHub repository secret with the same name. Until both are set the kit builder does nothing.

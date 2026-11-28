@@ -1,0 +1,168 @@
+<!doctype html>
+<html><head><meta charset="utf-8"><title>MediaPort kit scenes</title>
+<style>
+  html,body{margin:0;background:transparent;overflow:hidden}
+  #stage{position:absolute;left:0;top:0;overflow:hidden;perspective:1600px}
+  .abs{position:absolute}
+  .world{position:absolute;transform-style:preserve-3d}
+  .lg{position:absolute;left:0;top:0;transform-style:preserve-3d}
+  .lg>*{position:absolute;inset:0}
+  .lg img{width:100%;height:100%;object-fit:contain}
+  .tile{display:grid;place-items:center;border-radius:22%;font:800 1px/1 system-ui,"Segoe UI",Arial,sans-serif;color:var(--bl);background:linear-gradient(160deg,var(--ba),var(--bf))}
+</style></head>
+<body><div id="stage"></div>
+<script type="module">
+// Brand-driven kit scenes (studio spec §6). Every scene exposes renderAt(t) (pure in t), DURATION and its size,
+// so kit/build.mjs can capture frames deterministically. Colours come only from the organisation's Brand Profile.
+const q = new URLSearchParams(location.search);
+const SC = q.get('s'), V = q.get('v') || '';
+const B = window.__B;
+const C = B.brand, SOBER = B.theme === 'sober', REDUCED = B.motion === 'reduced';
+const S = document.getElementById('stage');
+const root = document.documentElement;
+for (const [k, v] of Object.entries({ p: C.p, d: C.d, a: C.a, f: C.f, m: C.m, l: C.l })) root.style.setProperty('--b' + k, v);
+const clamp = (v, a = 0, b = 1) => Math.min(b, Math.max(a, v)), lerp = (a, b, p) => a + (b - a) * p, seg = (t, a, b) => clamp((t - a) / (b - a));
+const ease = { out: (p) => 1 - (1 - p) ** 3, in: (p) => p ** 3, inOut: (p) => (p < 0.5 ? 4 * p ** 3 : 1 - (-2 * p + 2) ** 3 / 2), back: (p) => { const c = 1.7; return 1 + (c + 1) * (p - 1) ** 3 + c * (p - 1) ** 2; } };
+const el = (tag, css, parent = S, html = '') => { const e = document.createElement(tag); e.style.cssText = css; if (html) e.innerHTML = html; parent.appendChild(e); return e; };
+const hexA = (h, a) => { const n = parseInt(h.slice(1), 16); return `rgba(${n >> 16},${(n >> 8) & 255},${n & 255},${a})`; };
+function rng(seed) { let s = seed >>> 0; return () => { s = (s + 0x6d2b79f5) >>> 0; let r = Math.imul(s ^ (s >>> 15), 1 | s); r = (r + Math.imul(r ^ (r >>> 7), 61 | r)) ^ r; return ((r ^ (r >>> 14)) >>> 0) / 4294967296; }; }
+
+/** The organisation's logo as an extruded 3D object (stacked layers; uses the uploaded logo, else the text mark). */
+function logo3D(parent, w, h, depth = 26, layers = 16) {
+  const g = el('div', `width:${w}px;height:${h}px`, parent); g.className = 'lg';
+  const face = (z, filter, back = false) => {
+    const box = el('div', `transform:translateZ(${z}px)${back ? ' rotateY(180deg)' : ''};filter:${filter};backface-visibility:hidden`, g);
+    if (B.logo) box.innerHTML = `<img src="${B.logo}" alt="">`;
+    else { box.className = 'tile'; box.style.fontSize = Math.round(h * 0.42) + 'px'; box.textContent = B.mk; box.style.width = h + 'px'; box.style.left = (w - h) / 2 + 'px'; }
+    return box;
+  };
+  face(-depth, 'brightness(.85)', true);
+  for (let i = layers - 1; i >= 1; i--) { const z = -depth + (depth * i) / layers; face(z, `brightness(${0.35 + 0.3 * (i / layers)})`); face(z, `brightness(${0.35 + 0.3 * (1 - i / layers)})`, true); }
+  face(0.5, 'none');
+  const sheen = el('div', `transform:translateZ(1px);opacity:0;background:linear-gradient(105deg,transparent 40%,rgba(255,255,255,.75) 50%,transparent 60%);background-size:300% 100%;mix-blend-mode:screen;${B.logo ? `-webkit-mask:url(${B.logo}) center/contain no-repeat;mask:url(${B.logo}) center/contain no-repeat` : 'border-radius:22%'}`, g);
+  if (!B.logo) { sheen.style.width = h + 'px'; sheen.style.left = (w - h) / 2 + 'px'; }
+  return {
+    set({ x = 0, y = 0, z = 0, rx = 0, ry = 0, s = 1, o = 1, sh = -1 }) {
+      g.style.transform = `translate3d(${x - w / 2}px,${y - h / 2}px,${z}px) rotateX(${rx}deg) rotateY(${ry}deg) scale(${s})`;
+      g.style.opacity = o;
+      sheen.style.opacity = sh < 0 || sh > 1 ? 0 : 1; sheen.style.backgroundPosition = `${100 - sh * 100}% 0`;
+    },
+  };
+}
+/** Light rays drawn once on a canvas (24 rays, every 15°, so a loop that turns a multiple of 15° is seamless). */
+function rays(parent, size, color, alpha = 0.5) {
+  const c = el('canvas', `left:0;top:0;width:${size}px;height:${size}px`, parent); c.className = 'abs';
+  const res = 1400; c.width = c.height = res; const x = c.getContext('2d'), r = res / 2;
+  const gr = x.createRadialGradient(r, r, 0, r, r, r); gr.addColorStop(0, hexA(color, alpha)); gr.addColorStop(0.6, hexA(color, alpha * 0.2)); gr.addColorStop(1, hexA(color, 0));
+  x.fillStyle = gr; x.filter = 'blur(3px)';
+  for (let i = 0; i < 24; i++) { const a = (i * Math.PI) / 12; x.beginPath(); x.moveTo(r, r); x.arc(r, r, r, a - 0.045, a + 0.045); x.fill(); }
+  return { set(cx, cy, rot, s, o) { c.style.transform = `translate(${cx - size / 2}px,${cy - size / 2}px) rotate(${rot}deg) scale(${s})`; c.style.opacity = o; } };
+}
+/** Sparks on a canvas: a burst from a point, or a field drifting upwards that loops every `period` seconds. */
+function sparks(parent, w, h, n, seed) {
+  const c = el('canvas', `left:0;top:0;width:${w}px;height:${h}px`, parent); c.className = 'abs'; c.width = w; c.height = h;
+  const x = c.getContext('2d'), r = rng(seed), P = Array.from({ length: n }, () => ({ a: r() * 6.283, sp: 0.4 + r() * 0.9, sz: 1.5 + r() * 4, dl: r() * 0.3, ph: r(), tw: r() * 6 }));
+  const dot = (px, py, s, o) => { if (o <= 0.01) return; const g = x.createRadialGradient(px, py, 0, px, py, s * 4); g.addColorStop(0, `rgba(255,255,240,${o})`); g.addColorStop(0.3, hexA(C.a, o * 0.7)); g.addColorStop(1, hexA(C.a, 0)); x.fillStyle = g; x.beginPath(); x.arc(px, py, s * 4, 0, 6.283); x.fill(); };
+  return {
+    burst(cx, cy, p, rad) { x.clearRect(0, 0, w, h); if (p <= 0 || p >= 1) return; for (const q of P) { const lp = clamp((p - q.dl) / (1 - q.dl)); if (!lp) continue; const d = (1 - 2 ** (-10 * lp)) * rad * q.sp; dot(cx + Math.cos(q.a) * d, cy + Math.sin(q.a) * d + lp * lp * 100, q.sz, 1 - lp); } },
+    drift(t, period, alpha) { x.clearRect(0, 0, w, h); P.forEach((q, i) => { const ph = (t / period + q.ph + i / n) % 1; dot((Math.cos(q.a) * 0.5 + 0.5) * w + Math.sin((t / period) * 6.283 + q.tw) * 30, h - ph * (h + 40) + 20, q.sz * 0.8, alpha * Math.sin(ph * Math.PI) * (0.4 + 0.6 * (0.5 + 0.5 * Math.sin((t / period) * 18.85 + q.tw)))); }); },
+  };
+}
+const background = (dark) => `radial-gradient(ellipse 120% 90% at 50% 8%,${C.p} 0%,${C.d} 55%,${dark ? '#000' : C.m} 130%)`;
+
+const SCENES = {
+  // 20 s seamless motion background (standard or dark), 1920×1080, opaque
+  bg: { w: 1920, h: 1080, dur: 20, make() {
+    const dark = V === 'dark';
+    el('div', `inset:0;background:${background(dark)}`).className = 'abs';
+    const ry = SOBER ? null : rays(S, 3400, C.a, dark ? 0.18 : 0.3);
+    const cv = el('canvas', 'left:0;top:0;width:1920px;height:1080px'); cv.className = 'abs'; cv.width = 1920; cv.height = 1080; const x = cv.getContext('2d');
+    const sp = SOBER ? null : sparks(S, 1920, 1080, 70, 9);
+    el('div', `inset:0;background:radial-gradient(ellipse at 50% 50%,transparent 40%,rgba(0,0,0,${dark ? 0.6 : 0.45}) 100%)`).className = 'abs';
+    const r = rng(4), bok = Array.from({ length: 20 }, () => ({ x: r() * 1920, y: r() * 1080, s: 30 + r() * 90, k: 1 + Math.floor(r() * 2), ph: r() }));
+    const band = (t, y, amp, th, c1, c2, ph, al) => { const p = t / 20; x.globalAlpha = al; x.beginPath(); const pts = []; for (let px = -40; px <= 1960; px += 20) pts.push([px, y + Math.sin(px / 520 + p * 6.283 + ph) * amp + Math.sin(px / 260 - p * 12.566 + ph * 2) * amp * 0.35]);
+      pts.forEach(([a, b], i) => (i ? x.lineTo(a, b - th / 2) : x.moveTo(a, b - th / 2))); for (let i = pts.length - 1; i >= 0; i--) x.lineTo(pts[i][0], pts[i][1] + th / 2); x.closePath(); const g = x.createLinearGradient(0, y - amp - th, 0, y + amp + th); g.addColorStop(0, c2); g.addColorStop(1, c1); x.fillStyle = g; x.fill(); x.globalAlpha = 1; };
+    return (t) => { const p = t / 20; ry?.set(960, -220, p * 60, 1, 1); x.clearRect(0, 0, 1920, 1080);
+      for (const b of bok) { const y = ((b.y - p * 1080 * b.k) % 1180 + 1180) % 1180 - 50; const g = x.createRadialGradient(b.x, y, 0, b.x, y, b.s); const a = (SOBER ? 0.05 : 0.09) + 0.05 * Math.sin(p * 12.566 + b.ph * 6.283); g.addColorStop(0, hexA(C.a, a)); g.addColorStop(1, hexA(C.a, 0)); x.fillStyle = g; x.beginPath(); x.arc(b.x, y, b.s, 0, 6.283); x.fill(); }
+      band(t, 905, 45, 70, C.m, C.l, 0, dark ? 0.25 : 0.4); band(t, 960, 55, 90, C.f, C.a, 1.3, dark ? 0.3 : 0.5); band(t, 860, 30, 16, C.a, '#ffffff', 2.6, dark ? 0.3 : 0.55);
+      sp?.drift(t, 20, dark ? 0.35 : 0.6); };
+  } },
+  // Still backgrounds (1080p; the builder renders 4K at 2× device scale)
+  still: { w: 1920, h: 1080, dur: 1, make() {
+    el('div', `inset:0;background:${background(V === 'scripture')}`).className = 'abs';
+    if (!SOBER) rays(S, 3200, C.a, 0.22).set(960, V === 'welcome' ? 470 : -200, 4, 1, 1);
+    el('div', 'inset:0;background:radial-gradient(ellipse at 50% 50%,transparent 40%,rgba(0,0,0,.5) 100%)').className = 'abs';
+    if (!SOBER) sparks(S, 1920, 1080, 50, 3).drift(3.3, 20, 0.5);
+    const ribbon = () => el('div', `left:-5%;right:-5%;bottom:-60px;height:130px;border-radius:50%;background:linear-gradient(180deg,${C.m} 0 40%,${C.f} 40% 100%);opacity:.85`).className = 'abs';
+    if (V === 'welcome') { const w = el('div', 'left:960px;top:470px'); w.className = 'world'; logo3D(w, 1000, 560, 34, 18).set({ ry: -12, rx: 5 }); ribbon(); }
+    if (V === 'lyrics') ribbon();
+    if (V === 'scripture') { el('div', `left:60px;top:60px;right:60px;bottom:60px;border:4px solid ${C.a};border-radius:28px;box-shadow:0 0 40px ${hexA(C.a, 0.35)}`).className = 'abs'; el('div', `left:120px;top:230px;width:1680px;height:700px;border-radius:24px;background:linear-gradient(180deg,rgba(255,255,255,.08),rgba(0,0,0,.25))`).className = 'abs'; el('div', `left:560px;top:60px;width:800px;height:120px;border-radius:0 0 26px 26px;background:linear-gradient(180deg,${C.a},${C.f})`).className = 'abs'; }
+    if (V === 'announcement') { el('div', `left:-120px;top:0;width:900px;height:1080px;transform:skewX(-10deg);background:linear-gradient(160deg,${C.p},${C.d});box-shadow:30px 0 60px rgba(0,0,0,.5)`).className = 'abs'; el('div', `left:668px;top:0;width:16px;height:1080px;transform:skewX(-10deg);background:${C.a}`).className = 'abs'; const w = el('div', 'left:380px;top:500px'); w.className = 'world'; logo3D(w, 560, 320, 26, 14).set({ ry: 16, rx: 4 }); el('div', `left:820px;top:300px;width:980px;height:6px;border-radius:3px;background:linear-gradient(90deg,transparent,${C.a},transparent)`).className = 'abs'; ribbon(); }
+    if (V === 'sermon') { const w = el('div', 'left:960px;top:205px'); w.className = 'world'; logo3D(w, 520, 290, 22, 14).set({ ry: -10, rx: 4 }); el('div', `left:360px;top:400px;width:1200px;height:6px;border-radius:3px;background:linear-gradient(90deg,transparent,${C.a},transparent)`).className = 'abs'; ribbon(); }
+    return () => {};
+  } },
+  // 7 s intro sting (transparent): backdrop, light burst, logo flies in with a spin, sparks, exit. Reduced motion: 0.5 s fades.
+  intro: { w: 1920, h: 1080, dur: () => (REDUCED ? 2 : 7), make() {
+    const bg = el('div', `inset:0;background:${background(false)}`); bg.className = 'abs';
+    const ry = SOBER || REDUCED ? null : rays(S, 3000, C.a, 0.55);
+    const flash = el('div', `inset:0;background:radial-gradient(circle at 50% 44%,#fff 0%,${hexA(C.a, 0.8)} 20%,transparent 55%)`); flash.className = 'abs';
+    const w = el('div', 'left:960px;top:470px'); w.className = 'world'; const L = logo3D(w, 1000, 560, 40, 20);
+    const sp = SOBER || REDUCED ? null : sparks(S, 1920, 1080, 130, 11);
+    return (t) => {
+      if (REDUCED) { const o = seg(t, 0, 0.5) * (1 - seg(t, 1.5, 2)); bg.style.opacity = o; flash.style.opacity = 0; L.set({ o }); return; }
+      const bo = ease.out(seg(t, 0, 0.35)) * (1 - ease.in(seg(t, 6.2, 6.9))); bg.style.opacity = bo;
+      const f = seg(t, 0.15, 0.9); flash.style.opacity = SOBER ? 0 : f > 0 && f < 1 ? Math.sin(f * Math.PI) : 0;
+      const ri = ease.out(seg(t, 0.2, 1.6)), ro = ease.in(seg(t, 5.8, 6.6)); ry?.set(960, 470, t * 14, lerp(0.2, 1, ri), ri * (1 - ro) * 0.85);
+      const pin = seg(t, 0.25, 1.55), h = t - 1.55, po = seg(t, 5.7, 6.6);
+      let r_y = lerp(SOBER ? -90 : -540, 0, ease.out(pin)), z = lerp(-4000, 0, ease.out(pin)), o = clamp(pin * 4);
+      if (t > 1.55) r_y = Math.sin(h * 1.3) * 14 * clamp(h * 2);
+      if (po > 0) { r_y += ease.in(po) * 200; z += ease.in(po) * 1500; o *= 1 - ease.in(po); }
+      L.set({ ry: r_y, rx: t > 1.55 ? Math.sin(h * 0.9 + 1) * 5 : lerp(25, 0, pin), z, y: t > 1.55 ? Math.sin(h * 1.6) * 10 : 0, o, sh: t > 2 && t < 3.1 ? seg(t, 2, 3.1) : t > 4.2 && t < 5.2 ? seg(t, 4.2, 5.2) : -1 });
+      sp?.burst(960, 470, seg(t, 1.5, 3.6), 1100);
+    };
+  } },
+  // 2.5 s transition stinger (transparent): full cover from 0.9 to 1.5 s, cut at 1.2 s. Reduced motion: a 0.5 s crossfade.
+  stinger: { w: 1920, h: 1080, dur: () => (REDUCED ? 1.2 : 2.5), make() {
+    const cols = [[C.f, C.a], [C.m, C.l], [C.a, '#ffffff'], [C.d, C.p]];
+    const bands = cols.map(([a, b], i) => { const d = el('div', `top:-600px;height:2280px;width:${i === 3 ? 3400 : 1100}px;transform-origin:0 0;background:linear-gradient(90deg,${b},${a});box-shadow:0 0 50px rgba(0,0,0,.5)`); d.className = 'abs'; return d; });
+    const w = el('div', 'left:960px;top:520px'); w.className = 'world'; const L = logo3D(w, 820, 460, 30, 16);
+    return (t) => {
+      if (REDUCED) { const o = Math.sin(clamp(t / 1.2) * Math.PI); bands.forEach((b, i) => { b.style.transform = `translateX(${i === 3 ? -800 : 4000}px) skewX(-18deg)`; b.style.opacity = i === 3 ? o : 0; }); L.set({ o }); return; }
+      bands.forEach((b, i) => { const ip = ease.inOut(seg(t, i * 0.1, 0.55 + i * 0.1)), op = ease.inOut(seg(t, 1.55 + (3 - i) * 0.06, 2.2 + (3 - i) * 0.06)); const s0 = -2500 - i * 150, r = i === 3 ? -800 : -400 + i * 700, e = 2600 + i * 200; b.style.transform = `translateX(${op > 0 ? lerp(r, e, op) : lerp(s0, r, ip)}px) skewX(-18deg)`; });
+      const lp = seg(t, 0.55, 1.15), lo = seg(t, 1.45, 1.75); L.set({ ry: lerp(SOBER ? -60 : -360, 0, ease.out(lp)) + ease.in(lo) * 120, s: lerp(0.2, 1, ease.back(lp)) * (1 - ease.in(lo) * 0.3), o: lp > 0 ? 1 - ease.in(lo) : 0, sh: seg(t, 1, 1.5) });
+    };
+  } },
+  // 12 s corner logo loop, 800×500, transparent
+  corner: { w: 800, h: 500, dur: 12, make() {
+    const halo = el('div', `left:50px;top:40px;width:700px;height:420px;border-radius:50%;background:radial-gradient(ellipse,${hexA(C.a, 0.3)},transparent 70%)`); halo.className = 'abs';
+    const w = el('div', 'left:400px;top:255px'); w.className = 'world'; const L = logo3D(w, 620, 340, 22, 14);
+    const sp = SOBER || REDUCED ? null : sparks(S, 800, 500, 30, 5);
+    return (t) => { const p = t / 12, k = REDUCED ? 0 : 1; const spin = REDUCED || SOBER ? 0 : ease.inOut(seg(t, 8, 9.4)) * 360;
+      L.set({ ry: k * Math.sin(p * 12.566) * 16 + spin, rx: k * Math.sin(p * 18.85 + 1) * 6, y: k * Math.sin(p * 25.13) * 6, sh: REDUCED ? -1 : t > 2 && t < 3.2 ? seg(t, 2, 3.2) : -1 });
+      halo.style.opacity = 0.75 + 0.25 * Math.sin(p * 12.566) * k; sp?.drift(t, 12, 0.8); };
+  } },
+  // 8 s lower third loop, transparent, no text (name box 420,828 880×84; title box 420,922 780×60)
+  lowerthird: { w: 1920, h: 1080, dur: 8, make() {
+    el('div', 'left:150px;top:840px;width:1240px;height:180px;background:rgba(0,0,0,.5);filter:blur(22px);border-radius:20px').className = 'abs';
+    const plate = el('div', 'left:150px;top:820px;width:1240px;height:180px;transform-style:preserve-3d;transform-origin:0 50%'); plate.className = 'abs';
+    el('div', `left:0;top:0;width:100%;height:100px;clip-path:polygon(0 0,100% 0,96% 100%,0 100%);background:linear-gradient(180deg,${C.p},${C.d});border-top:7px solid ${C.a};box-sizing:border-box`, plate).className = 'abs';
+    el('div', `left:0;top:100px;width:88%;height:70px;clip-path:polygon(0 0,100% 0,96% 100%,0 100%);background:linear-gradient(180deg,${C.m},${C.d});border-bottom:7px solid ${C.f};box-sizing:border-box`, plate).className = 'abs';
+    const sheen = el('div', 'left:0;top:0;width:100%;height:170px;background:linear-gradient(105deg,transparent 40%,rgba(255,255,255,.45) 50%,transparent 60%);background-size:300% 100%;clip-path:polygon(0 0,100% 0,96% 58%,84.5% 58%,84.5% 100%,0 100%)', plate); sheen.className = 'abs';
+    const w = el('div', 'left:250px;top:860px'); w.className = 'world'; const L = logo3D(w, 300, 170, 14, 10);
+    return (t) => { const p = t / 8, k = REDUCED ? 0 : 1;
+      plate.style.transform = `perspective(1800px) rotateY(${-7 + k * Math.sin(p * 6.283) * 2.2}deg) rotateX(${2 + k * Math.sin(p * 12.566)}deg)`;
+      const s = SOBER || REDUCED ? -1 : seg(t, 1, 2.4); sheen.style.opacity = s > 0 && s < 1 ? 1 : 0; sheen.style.backgroundPosition = `${100 - s * 100}% 0`;
+      L.set({ ry: k * Math.sin(p * 6.283) * 20, y: k * Math.sin(p * 12.566) * 4 }); };
+  } },
+};
+
+const sc = SCENES[SC];
+S.style.width = sc.w + 'px'; S.style.height = sc.h + 'px';
+const tick = sc.make();
+window.SIZE = { w: sc.w, h: sc.h };
+window.DURATION = typeof sc.dur === 'function' ? sc.dur() : sc.dur;
+window.renderAt = (t) => tick(t);
+await Promise.all([...document.images].map((i) => (i.complete ? 0 : new Promise((r) => { i.onload = i.onerror = r; }))));
+window.renderAt(0);
+window.sceneReady = true;
+</script></body></html>

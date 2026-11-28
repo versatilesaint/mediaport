@@ -1,6 +1,6 @@
 // MediaPort OS control shell (brief §7, §7.1). Talks to the organisation's room over one WebSocket.
 // All on-air changes go through the room; this page only keeps local view state (selection, windows, theme).
-import {esc,TPL,T,CATS,SM,OUTS,PEOPLE,FIELDS,PACKS,PH,PHUI,fmt,tmrEl,tmrRem,tmrPhase,tmrText,brandVars,G,reconcile,listFor,tplLabel,sample,defTargets,clock,now,pagesOf,pageIdx,fit} from '/assets/catalog.js';
+import {esc,TPL,T,CATS,SM,OUTS,PEOPLE,FIELDS,PACKS,PH,PHUI,fmt,tmrEl,tmrRem,tmrPhase,tmrText,brandVars,G,reconcile,listFor,tplLabel,sample,defTargets,clock,now,pagesOf,pageIdx,fit,fieldsFor,framePositions,fmtCd} from '/assets/catalog.js';
 
 const $=(s,r=document)=>r.querySelector(s), $$=(s,r=document)=>[...r.querySelectorAll(s)];
 const store={get(k,d){try{const v=localStorage.getItem('mpos.'+k);return v==null?d:JSON.parse(v)}catch(e){return d}},set(k,v){try{localStorage.setItem('mpos.'+k,JSON.stringify(v))}catch(e){}}};
@@ -213,13 +213,19 @@ function renderLibrary(soft){const b=wb('library');if(!b) return;
   <div class="tgrid">${list.map(t=>`<button class="tcard" data-act="sel-tpl" data-tpl="${t.n}"><div class="row"><span class="sm"><i style="${SM[t.slot]}"></i></span><span class="num">#${t.n}</span><span class="pill live on" hidden>On</span></div><span class="nm">${esc(t.name)}</span><span class="meta">${t.comp} · ${t.slot}</span></button>`).join('')}</div></div></div>`;
   refreshLive();
 }
+/** Camera frames: where each OBS camera goes (canvas 1920×1080), with copy buttons and the OBS steps. */
+function obsBox(it){const rows=framePositions(it,it.data);if(!rows.length) return '';const txt=r=>`X ${r.x}  Y ${r.y}  W ${r.w}  H ${r.h}`;
+  return `<div class="obsbox"><div class="eyebrow">OBS position</div><table>${rows.map(r=>`<tr><td><b>${r.n}</b> ${esc(r.source)}</td><td class="mono">${txt(r)}</td><td><button class="btn sm" data-act="copy-text" data-text="${esc(txt(r))}">Copy</button></td></tr>`).join('')}</table>
+  <button class="btn sm" data-act="copy-text" data-text="${esc(rows.map(r=>`${r.n}. ${r.source}: ${txt(r)}`).join('\n'))}">Copy all</button>
+  <p class="muted" style="font-size:12px;margin:8px 0 0">In OBS: put each camera under the frame. Right-click the camera › Transform › Edit Transform: Position X and Y; Bounding Box Type “Scale to outer bounds”; Bounding Box Size = W × H; tick “Crop to Bounding Box”. The frame's Browser Source stays on top.</p></div>`}
 function renderEditor(){const b=wb('editor');if(!b) return;const s=st(),it=s.items[SEL];
   if(!it){b.innerHTML=`<p class="muted">${GOT?'Pick a template in the Library to start editing.':'Connecting to the room…'}</p>`;return}
-  const t=T(it.n),f=FIELDS[it.comp]||[],ro=!can('operator');
+  const t=T(it.n),f=fieldsFor(it),ro=!can('operator');
   const isTimer=it.comp==='timer';
   b.innerHTML=`<div class="ed"><div class="ed-h"><div style="flex:1;min-width:220px"><div class="eyebrow">#${t.n} · ${CATS[t.cat][0]} · ${t.comp}.${t.slot}</div><h3>${esc(t.name)}</h3></div><span data-edstate></span></div>
   <div class="ed-form">${isTimer?`<div class="note">This view follows the shared speaker timer. Start, pause and set time in the Speaker Timer app.</div><button class="btn" data-act="open" data-app="timer">${ico('timer')}Open Speaker Timer</button>`:''}
-   ${f.map(([k,l,ty])=>`<div class="field"><label for="f-${k}">${l}</label>${ty==='ta'?`<textarea class="inp" id="f-${k}" data-f="${k}" ${ro?'readonly':''}>${esc(it.data[k])}</textarea>`:`<input class="inp" id="f-${k}" data-f="${k}" ${ty==='num'?'type="number" min="0"':''} value="${esc(it.data[k])}" ${ro?'readonly':''}>`}</div>`).join('')}
+   ${f.map(([k,l,ty])=>`<div class="field"><label for="f-${k}">${l}</label>${ty&&ty.startsWith('sel:')?`<select class="inp" id="f-${k}" data-f="${k}" ${ro?'disabled':''}>${ty.slice(4).split('|').map(o=>{const [v,lab]=o.split('=');return `<option value="${v}"${String(it.data[k]??'')===v?' selected':''}>${lab||v}</option>`}).join('')}</select>`:ty==='ta'?`<textarea class="inp" id="f-${k}" data-f="${k}" ${ro?'readonly':''}>${esc(it.data[k])}</textarea>`:`<input class="inp" id="f-${k}" data-f="${k}" ${ty==='num'?'type="number" min="0"':''} value="${esc(it.data[k])}" ${ro?'readonly':''}>`}</div>`).join('')}
+   ${it.comp==='frame'?obsBox(it):''}
    ${it.n===149?'<label class="switch"><input type="checkbox" id="consent"> Parental consent recorded</label><div class="note warn">Children: no photos, and show a child’s name only when consent is recorded.</div>':''}
    ${ro?'':`<label class="switch"><input type="checkbox" id="livetype" ${it.liveTyping?'checked':''}> Update on air as I type</label>`}</div>
   <div class="ed-side"><div class="eyebrow">Show on</div><div class="chips">${OUTS.map(([o,l])=>`<button class="chip" data-act="tgt" data-out="${o}" aria-pressed="${it.targets[o]}" ${can('producer')?'':'disabled'}>${l}</button>`).join('')}</div>
@@ -396,6 +402,7 @@ document.addEventListener('click',async e=>{
     case 'oset':{const v=a.dataset.v;send({type:'output',output:a.dataset.out,key:a.dataset.k,value:isNaN(+v)?v:+v});break}
     case 'blackout':send({type:'output',output:a.dataset.out,key:'blackout',value:a.checked});break;
     case 'copy':{const txt=LINKS&&LINKS[a.dataset.out];if(!txt) break;try{await navigator.clipboard.writeText(txt);toast('Link copied','Paste it once into '+a.dataset.out+'.')}catch{toast('Copy blocked','Select the link text and copy it by hand.')}break}
+    case 'copy-text':{navigator.clipboard?.writeText(a.dataset.text||'').then(()=>{const o=a.textContent;a.textContent='Copied';setTimeout(()=>a.textContent=o,1200)}).catch(()=>{});break}
     case 'rotate':{if(a.dataset.armed!=='1'){a.dataset.armed='1';a.textContent='Tap again: old link stops';setTimeout(()=>{a.dataset.armed='';a.textContent='Rotate key'},4000);break}
       const r=await fetch(`/api/orgs/${encodeURIComponent(ORG)}/display-links/${a.dataset.out}/rotate`,{method:'POST'});
       if(r.ok){toast('Key rotated','Old link for '+a.dataset.out+' stopped. Paste the new one.','var(--amber)');loadLinks()}else toast('Not rotated','Try again.','var(--bad)');break}
@@ -480,7 +487,7 @@ function tick(){
   const nowT=now();const ck=new Date(nowT).toLocaleTimeString('en-GB',{hour:'2-digit',minute:'2-digit',second:'2-digit'});
   $('#clock').textContent=new Date(nowT).toLocaleDateString('en-GB',{weekday:'short',day:'numeric',month:'short'})+'  '+ck.slice(0,5);
   $$('[data-kind="clock"]').forEach(e=>e.textContent=ck);
-  $$('[data-kind="cd"]').forEach(e=>{const r=+e.dataset.t-nowT;e.textContent=r>0?fmt(r):'Starting'});
+  $$('[data-kind="cd"]').forEach(e=>{const r=+e.dataset.t-nowT;e.textContent=r>0?fmtCd(r):'Starting'});
   const s=st(),t=s.timer;if(!t) return;warnCheck(t);
   const ph=tmrPhase(t),pc=PH[ph][1],used=Math.min(1,tmrEl(t)/t.durationMs);
   $$('[data-kind="timer"]').forEach(e=>e.textContent=tmrText(t,!!e.dataset.short));
