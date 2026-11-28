@@ -43,7 +43,7 @@ export const DEFAULT_KIT: BrandKit = {
 const HEX = /^#[0-9a-f]{6}$/i;
 /** Fills the three new roles from the old six when missing. */
 export function completeColors(b: Partial<BrandColors> & Pick<BrandColors, 'p' | 'd' | 'a' | 'f' | 'm' | 'l'>): BrandColors {
-  return { ...b, sl: b.sl && HEX.test(b.sl) ? b.sl : '#f7f7fa', tl: b.tl && HEX.test(b.tl) ? b.tl : '#111318', lv: b.lv && HEX.test(b.lv) ? b.lv : '#e11d2e' } as BrandColors;
+  return { ...b, sl: b.sl && HEX.test(b.sl) ? b.sl : '#f7f7fa', tl: b.tl && HEX.test(b.tl) ? b.tl : '#111318', lv: b.lv && HEX.test(b.lv) ? b.lv : '#c8102e' } as BrandColors;
 }
 
 export function cleanColors(v: unknown): BrandColors | null {

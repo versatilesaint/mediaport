@@ -42,10 +42,8 @@ const canAdmin=['owner','admin'].includes(ROLE);
 async function load(){
   const m=await api('/members');
   $('#members').innerHTML='<table><tr><th>Email</th><th>Role</th></tr>'+m.members.map(x=>'<tr><td>'+esc(x.email)+'</td><td>'+esc(x.role)+'</td></tr>').join('')+'</table>'+(m.invites&&m.invites.length?'<p class="mut" style="margin-top:12px">Waiting to accept: '+m.invites.map(i=>esc(i.email)+' ('+esc(i.role)+')').join(', ')+'</p>':'');
-  if(canAdmin){const d=await api('/display-links');$('#links').innerHTML=Object.entries(d.links).map(([o,u])=>'<div class="card" style="margin-bottom:10px"><div class="row" style="justify-content:space-between"><b>'+esc(o)+'</b><span class="row"><button class="btn sm" data-copy="'+esc(u)+'">Copy</button><button class="btn sm danger" data-rotate="'+esc(o)+'">Rotate key</button></span></div><div class="mono" style="margin-top:8px">'+esc(u)+'</div></div>').join('')}
 }
-document.addEventListener('click',async e=>{const c=e.target.closest('[data-copy]');if(c){try{await navigator.clipboard.writeText(c.dataset.copy);c.textContent='Copied'}catch{c.textContent='Select and copy'}}
- const r=e.target.closest('[data-rotate]');if(r){if(r.dataset.armed!=='1'){r.dataset.armed='1';r.textContent='Tap again: old link stops';return}await api('/display-links/'+r.dataset.rotate+'/rotate',{method:'POST'});load()}});
+
 const f=$('#invite');if(f) f.addEventListener('submit',async e=>{e.preventDefault();const out=$('#invout');out.className='';out.textContent='Creating…';
  try{const j=await api('/invites',{method:'POST',body:JSON.stringify({email:f.email.value,role:f.role.value})});out.className='ok';out.innerHTML='Invite link (valid 7 days, send it to them): <div class="mono" style="margin-top:6px">'+esc(j.url)+'</div>';f.reset();load()}catch(err){out.className='err';out.textContent=err.message}});
 load().catch(e=>{$('#members').textContent=e.message});`;
@@ -59,11 +57,13 @@ load().catch(e=>{$('#members').textContent=e.message});`;
             .map((r) => `<option>${r}</option>`)
             .join('')}</select></label><button class="btn pri">Create invite</button></form><p id="invout"></p>
       <h2>Display links</h2><p class="mut">Paste each link once: OBS Browser Source, FreeShow Website item, or any screen for Stage. Links are display-only.</p><div id="links">Loading…</div>
+      <h2 id="activity">Activity</h2><p class="mut">What went on air, and changes to the team, links and brand. Times are in your organisation's time zone.</p>
+      <div class="card"><div class="row" style="margin-bottom:12px"><input id="actQ" type="search" placeholder="Filter (name, graphic, action)" style="flex:1;min-width:200px"><select id="actDays" style="width:auto"><option value="1">Today</option><option value="7">7 days</option><option value="30" selected>30 days</option><option value="365">A year</option></select><a class="btn sm" id="actCsv" href="#">Download CSV</a></div><div id="actList" class="tw">Loading…</div></div>
       <h2 id="brand">Brand</h2><p class="mut">Your on-air look: colours, fonts, logos and the Bible version. Changes reach OBS, FreeShow and Stage straight away, without reloading them.</p>
       <div id="brandEd" data-org="${esc(org.slug)}"><div class="card">Loading…</div></div>`
         : ''
     }`,
-    { user, script, room: 'platform', scriptSrc: ['owner', 'admin'].includes(role) ? '/assets/brand-editor.js' : undefined, css: ['owner', 'admin'].includes(role) ? ['/assets/graphics.css'] : undefined },
+    { user, script, room: 'platform', scriptSrc: ['owner', 'admin'].includes(role) ? '/assets/team.js' : undefined, css: ['owner', 'admin'].includes(role) ? ['/assets/graphics.css'] : undefined },
   );
 }
 

@@ -116,9 +116,7 @@
 .trn h2{position:absolute;inset:0;display:grid;place-items:center;margin:0;font:700 120px var(--f-display);color:var(--bl);animation:trnT 2.6s ease both}
 @keyframes trn{0%{transform:translateX(-100%) skewX(-14deg)}35%,65%{transform:translateX(10%) skewX(-14deg)}100%{transform:translateX(140%) skewX(-14deg)}}
 @keyframes trnT{0%,22%{opacity:0;transform:scale(.9)}35%,65%{opacity:1;transform:none}80%,100%{opacity:0}}
-.qr{width:150px;height:150px;border-radius:14px;background:#fff;padding:14px;box-sizing:border-box;display:grid;grid-template-columns:repeat(9,1fr);gap:2px}
-.qr i{background:#111;border-radius:1px}
-.qr i.o{background:transparent}
+.qr{display:block;border-radius:14px;box-shadow:0 20px 40px -16px rgba(0,0,0,.6)}
 
 
 /* Brand Profile v2: uploaded logos, sober look (funerals, solemn services) and reduced motion */
@@ -130,3 +128,4 @@
 .reduce-motion .g{animation:gFade .2s ease both!important}.reduce-motion .g.out{animation:gFadeOut .2s ease both!important}
 .reduce-motion .sweep{display:none}
 @keyframes gFade{from{opacity:0}}@keyframes gFadeOut{to{opacity:0}}
+.revoked{position:absolute;left:40px;bottom:40px;max-width:900px;padding:16px 22px;border-radius:12px;background:rgba(20,22,26,.82);color:#e5e7eb;font:500 24px/1.35 system-ui,-apple-system,'Segoe UI',sans-serif}

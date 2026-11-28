@@ -1,6 +1,7 @@
 // MediaPort template catalogue and broadcast renderer.
 // One source for the control shell previews, the display outputs (OBS, FreeShow, Stage) and the Worker's room seeding.
 // Pure data and string functions only at module level, so the Worker can import it too.
+import qrcode from './vendor/qrcode.js';
 
 export const esc=s=>String(s??'').replace(/[&<>"']/g,c=>({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#39;'}[c]));
 /** Clock synchronised with the room: every screen adds the same server offset (brief §5.2: server time, not screen time). */
@@ -301,7 +302,7 @@ export const FIELDS={
  title:[['kicker','Small heading'],['title','Title'],['sub','Subtitle']],
  points:[['heading','Heading'],['points','Points (one per line)','ta'],['reveal','Show how many','num']],
  quote:[['text','Quote','ta'],['by','Attribution']],
- card:[['kicker','Small heading'],['heading','Heading'],['body','Body','ta'],['when','When / where']],
+ card:[['kicker','Small heading'],['heading','Heading'],['body','Body','ta'],['when','When / where'],['link','QR code link (giving and registration cards)']],
  banner:[['label','Label'],['text','Text']],
  ticker:[['label','Label'],['text','Items (separate with •)','ta']],
  bar:[['left','Left'],['right','Right']],
@@ -341,7 +342,11 @@ export function brandVars(org){const b=org.brand;let v=`--bp:${b.p};--bd:${b.d};
 export function brandClass(org){const k=org&&org.kit;return [k&&k.theme==='sober'?'sober':'',k&&k.motion==='reduced'?'reduce-motion':''].filter(Boolean).join(' ')}
 /** The organisation's logo for a dark (default) or light background, or '' when none is uploaded. */
 export function logoUrl(org,kind='mark',bg='dark'){const l=org&&org.kit&&org.kit.logos||{};const want=kind+'_'+(bg==='dark'?'light':'dark');return l[want]||l[kind+'_light']||l[(kind==='mark'?'full':'mark')+'_light']||''}
-export function qr(seed){let h=seed*2654435761>>>0,s='';for(let i=0;i<81;i++){h=(h^(h<<13))>>>0;h=(h^(h>>>17))>>>0;h=(h^(h<<5))>>>0;const r=Math.floor(i/9),c=i%9;const f=(r<3&&c<3)||(r<3&&c>5)||(r>5&&c<3);const ring=f&&!((r%6===1)&&(c%6===1));s+=`<i class="${(f?ring:(h&1))?'':'o'}"></i>`}return `<div class="qr">${s}</div>`}
+/** A real, scannable QR code as SVG (dark modules on white, with the quiet zone). '' when there's no text. */
+export function qrSvg(text,size=220){if(!text) return '';const q=qrcode(0,'M');q.addData(String(text).slice(0,600));q.make();const n=q.getModuleCount(),m=n+8;let d='';for(let r=0;r<n;r++)for(let c=0;c<n;c++)if(q.isDark(r,c))d+=`M${c+4} ${r+4}h1v1h-1z`;
+  return `<svg class="qr" viewBox="0 0 ${m} ${m}" width="${size}" height="${size}" shape-rendering="crispEdges" role="img" aria-label="QR code"><rect width="${m}" height="${m}" fill="#fff"/><path d="${d}" fill="#111"/></svg>`}
+/** The link a giving / registration card's QR code points to: the card's own link, else the organisation website. */
+export const qrLink=(d,org)=>{const l=String(d.link||'').trim()||(org&&org.web?String(org.web):'');if(!l) return '';return /^https?:\/\//i.test(l)?l:'https://'+l.replace(/^\/+/,'')}
 export function G(it,d,out,idx,org,st){
   const t=T(it.n),c=it.comp,full=it.slot==='fullscreen';
   const sw='<div class="sweep"></div>';
@@ -359,7 +364,7 @@ export function G(it,d,out,idx,org,st){
       return ['full',`<div class="kk">${esc(t.name)}</div><h1 style="font-size:84px">${esc(d.heading)}</h1><ol>${ps.map((p,i)=>`<li class="${i>=rv?'dim':''}">${esc(p)}</li>`).join('')}</ol>`];}
     case 'quote': return ['ttl" style="right:110px',`<div class="box">${sw}<h2 style="font-size:52px;font-style:italic">“${esc(d.text)}”</h2><div class="sb">${esc(d.by)}</div></div>`];
     case 'card':{const sober=/Memorial|Remembrance/.test(t.name);const q=/QR|Registration|Giving|Online Giving/.test(t.name);
-      return ['full'+(sober?' sober':''),`<div class="kk">${esc(d.kicker)}</div><h1>${esc(d.heading)}</h1>${d.body?`<div class="bd">${esc(d.body)}</div>`:''}${d.when?`<div class="wh">${esc(d.when)}</div>`:''}${q?`<div style="position:absolute;right:170px;bottom:140px">${qr(t.n)}</div>`:''}`];}
+      return ['full'+(sober?' sober':''),`<div class="kk">${esc(d.kicker)}</div><h1>${esc(d.heading)}</h1>${d.body?`<div class="bd">${esc(d.body)}</div>`:''}${d.when?`<div class="wh">${esc(d.when)}</div>`:''}${q&&qrLink(d,org)?`<div style="position:absolute;right:170px;bottom:140px">${qrSvg(qrLink(d,org))}</div>`:''}`];}
     case 'banner':{const k=/Emergency/.test(t.name)?' emg':/Breaking/.test(t.name)?' brk':'';return ['bn'+k+(idx>0?' st2':''),`<div class="lb">${esc(d.label)}</div><div class="tx">${k?'':sw}${esc(d.text)}</div>`];}
     case 'ticker':{const txt=esc(d.text);return ['tk',`<div class="lb">${esc(d.label)}</div><div class="trk"><div class="mq"><span>${txt}</span><span>${txt}</span></div></div>`];}
     case 'bar': return ['br',`<span>${esc(d.left)}</span><span class="r">${esc(d.right)}</span>`];

@@ -36,7 +36,11 @@ function render(fresh) {
   tick();
 }
 
+let lastRev = -1;
 function apply(s, p, fresh) {
+  // A snapshot older than the one on screen (late delivery) is ignored. A fresh connection always resyncs.
+  if (!fresh && typeof s.rev === 'number' && s.rev < lastRev) return;
+  if (typeof s.rev === 'number') lastRev = s.rev;
   state = s;
   if (p) profile = { ...profile, ...p };
   render(fresh);
@@ -59,13 +63,33 @@ function connect() {
     if (m.type === 'hello') clock.offset = m.serverTime - Date.now();
     else if (m.type === 'pong') clock.offset = m.serverTime + (Date.now() - m.t) / 2 - Date.now();
     else if (m.type === 'snapshot') { apply(m.state, m.profile, first); first = false; }
+    else if (m.type === 'access_changed') accessChanged(ws);
   };
-  ws.onclose = (e) => {
+  ws.onclose = async (e) => {
     if (dot) dot.dataset.s = 'off';
+    first = true; // the next snapshot is a full resync
+    if (ws.mpDone) return; // handled by accessChanged()
+    // 4001: access changed. If this link was replaced, clear the graphics and say so (neutral, no branding).
+    if (e.code === 4001 && (await linkGone())) { revoked(); return; }
     // 4001: the key was rotated or the organisation suspended. Keep the last picture; stop retrying fast.
     setTimeout(connect, e.code === 4001 ? 30000 : wait);
     wait = Math.min(5000, wait * 2);
   };
+}
+async function linkGone() {
+  try { return (await fetch(location.href, { method: 'HEAD', cache: 'no-store' })).status === 404; } catch { return false; /* offline: keep the last picture */ }
+}
+/** The room says this screen's access changed (new link made, or organisation suspended). */
+async function accessChanged(sock) {
+  sock.mpDone = true;
+  try { sock.close(); } catch {}
+  if (await linkGone()) { revoked(); return; }
+  setTimeout(connect, 30000);
+}
+function revoked() {
+  state = null;
+  try { localStorage.removeItem(CACHE); } catch {}
+  cv.innerHTML = '<div class="revoked" role="status">This MediaPort screen link was replaced. Paste the new link from Team &amp; screen links.</div>';
 }
 setInterval(() => { if (ws && ws.readyState === 1) ws.send(JSON.stringify({ v: 1, type: 'ping', t: Date.now() })); }, 30000);
 

@@ -281,7 +281,21 @@ export default {
       if (sub === 'display-links' && req.method === 'GET') {
         const keys = await scope.displayKeys();
         const links = Object.fromEntries(OUTPUTS.map((o) => [o, `${url.origin}/${scope.org.slug}/o/${o}?k=${keys[o]}`]));
-        return json({ links });
+        return json({ links, status: await room(env, scope.org).displayStatus() });
+      }
+      // ----- Activity: on-air log (room) + team/link/brand changes (audit), filter and CSV export -----
+      if ((sub === 'activity' || sub === 'activity.csv') && req.method === 'GET') {
+        const q = (url.searchParams.get('q') || '').toLowerCase().slice(0, 80);
+        const since = Date.now() - Math.min(365, Math.max(1, Number(url.searchParams.get('days')) || 30)) * 86_400_000;
+        const onAir = ((await room(env, scope.org).activity()) as { t: number; msg: string; by: string }[]).map((e) => ({ at: e.t, kind: 'on air', what: e.msg, who: e.by }));
+        const admin = (await scope.auditLog()).map((e) => ({ at: e.at, kind: 'admin', what: e.action + (e.detail ? ' · ' + e.detail : ''), who: e.email || 'MediaPort' }));
+        const rows = [...onAir, ...admin].filter((r) => r.at >= since && (!q || (r.what + ' ' + r.who).toLowerCase().includes(q))).sort((a, b) => b.at - a.at);
+        if (sub === 'activity') return json({ rows, tz: scope.org.tz });
+        const fmt = new Intl.DateTimeFormat('en-GB', { timeZone: scope.org.tz, dateStyle: 'short', timeStyle: 'medium' });
+        // Spreadsheet-safe CSV: quote every cell; neutralise leading = + - @ (formula injection).
+        const cell = (v: string) => '"' + v.replace(/^[=+\-@\t\r]/, "'$&").replace(/"/g, '""') + '"';
+        const csv = ['Time (' + scope.org.tz + ')', 'Type', 'What', 'Who'].map(cell).join(',') + '\r\n' + rows.map((r) => [fmt.format(r.at), r.kind, r.what, r.who].map(cell).join(',')).join('\r\n');
+        return new Response(csv, { headers: { 'content-type': 'text/csv; charset=utf-8', 'content-disposition': `attachment; filename="${scope.org.slug}-activity.csv"`, 'cache-control': 'no-store', 'x-content-type-options': 'nosniff' } });
       }
       if (parts[3] === 'display-links' && parts[5] === 'rotate' && req.method === 'POST') {
         const out = parts[4];

@@ -264,3 +264,27 @@ graphics legibly.
 Then, pending D4: **Phase 2** core templates (paging, auto-fit, song paste, scripture pagination, countdown to
 date/time, Emergency pre-emption, Preview/Take), **Phase 3** camera frames + generated assets, **Phase 4** kit,
 **Phase 5** extras + Link agent.
+
+---
+
+## 8. Phase 1 status (28 November 2026): done
+
+| Task | Result |
+|---|---|
+| 0 Platform brand and rooms | `/` 3D landing page; room bar on every page (Home, Control, Platform, Kits, Help, Guidelines); favicons + manifest; `/control` opens your studio; `/platform` signs in / lists organisations / owner admin; `/kits`, `/help`, `/guidelines` |
+| 1 Brand Profile v2 | Nine colour roles, contrast warnings, fonts, standard / sober look, full / reduced motion, Bible version with licence rule, CCLI (`packages/core/src/brand.ts`) |
+| 2 Logos | Four variants in R2; PNG/SVG only; metadata stripped; unsafe SVG refused; sandboxed serving |
+| 3 Brand editor | Team page › Brand (admins): palettes, contrast pills, live preview with the on-air renderer, logo slots; changes reach screens live |
+| 4 State `rev` | Monotonic version on every save; screens ignore late, older snapshots and resync on reconnect |
+| 5 Screen links panel | Real QR codes (vendored `qrcode-generator`, MIT), connected now / last seen, two-step new link; a replaced link clears the screen and says so (`access_changed` message, then close) |
+| 6 Addresses | Old `/{org}/…` links unchanged; room names reserved |
+| 7 Rate limit, activity | 40 operations at once then 10 a second per control connection; Team › Activity with filter and spreadsheet-safe CSV in the organisation time zone |
+| 8 Tests | `npm test`: 36 tests (isolation, room, brand, Phase 1 acceptance); files now run one at a time |
+
+Also fixed: giving and registration cards now show a **real** QR code (card link, else the organisation website)
+instead of a decorative pattern; a rotated link now reliably tells a connected screen (the close frame alone
+was not always delivered through the local proxy).
+
+**Acceptance (spec §12):** two control browsers + an OBS screen in sync in under 500 ms ✔; a new link revokes the
+old one immediately ✔; a non-team user is locked out ✔; three contrasting palettes save and preview, weak
+contrast warned ✔.
