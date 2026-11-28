@@ -288,3 +288,20 @@ was not always delivered through the local proxy).
 **Acceptance (spec §12):** two control browsers + an OBS screen in sync in under 500 ms ✔; a new link revokes the
 old one immediately ✔; a non-team user is locked out ✔; three contrasting palettes save and preview, weak
 contrast warned ✔.
+
+---
+
+## 9. Phase 2 status (28 November 2026): core templates
+
+| Spec item | Result |
+|---|---|
+| Paging (01 Lyrics, 02 Scripture) | Paste a whole song (verses by blank lines, 1–4 lines per page); passages split between words (170 / 380 characters); room `page` operation; Next / Prev, Space and arrows page first, then move the running order; "n / N" tag on air |
+| Auto-fit | `fit()` in the shared renderer: binary search on font size for names, lyrics and Scripture; never overflows |
+| 08 Countdowns | Minutes from Show, a set time (today / tomorrow, or a date), or the next of a weekly schedule, in the organisation time zone with clock changes |
+| 18 Emergency pre-emption | #183 goes to every screen, drawn on top, never pushed off by other graphics; only Hide / Clear |
+| Who's online | Name, role and since when |
+| Preview / Program / Take (D6) | The studio already has the Program monitors and a TAKE button; the Editor shows the selected (next) graphic |
+| Tablet | Studio checked at iPad Pro 11 landscape: Take, Prev / Next, per-screen switches all reachable |
+| Tests | `tests/phase2.test.mjs` (paging, roles, passage split, countdowns incl. BST, emergency, presence); 42 tests pass |
+
+Still to do in later phases: per-template layouts for the remaining generic templates, 09–16 refinements, sober theme for every graphic (Phase 5), camera frames and generated assets (Phase 3), kit (Phase 4), Link agent (Phase 5).

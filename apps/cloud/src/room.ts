@@ -6,14 +6,14 @@ import { DurableObject } from 'cloudflare:workers';
 import type { Env } from './env';
 import { roleAtLeast, type Role } from '../../../packages/core/src/index';
 // @ts-expect-error plain JS module shared with the browser
-import { T, TPL, FIELDS, PACKS, MULTI, sample, defTargets } from '../public/assets/catalog.js';
+import { T, TPL, FIELDS, PACKS, MULTI, sample, defTargets, countdownTarget, isEmergency, pagesOf } from '../public/assets/catalog.js';
 
 type OutputId = 'obs' | 'freeshow' | 'stage';
 const OUT_IDS: OutputId[] = ['obs', 'freeshow', 'stage'];
 
 export interface OrgProfile {
   slug: string; name: string; short: string; mk: string; loc: string; motto: string; web: string;
-  depts: string[]; lead: [string, string]; brand: Record<'p' | 'd' | 'a' | 'f' | 'm' | 'l' | 'sl' | 'tl' | 'lv', string>; pack: string; svc: string;
+  depts: string[]; lead: [string, string]; tz?: string; brand: Record<'p' | 'd' | 'a' | 'f' | 'm' | 'l' | 'sl' | 'tl' | 'lv', string>; pack: string; svc: string;
   /** Brand Profile v2: fonts, look, motion, Scripture version, CCLI, logo URLs (studio spec §2) */
   kit?: { fonts: { heading: string; body: string; scripture: string }; theme: string; motion: string; scripture: string; ccli: string; logos: Record<string, string> };
 }
@@ -31,7 +31,7 @@ export interface State {
   /** monotonic version: screens ignore an older snapshot that arrives late (studio spec §1) */
   rev?: number;
 }
-interface Attachment { role: 'display' | 'control'; output?: OutputId; userId?: string; email?: string; roleName?: Role }
+interface Attachment { role: 'display' | 'control'; output?: OutputId; userId?: string; email?: string; roleName?: Role; since?: number }
 
 const ID_RE = /^i[a-z0-9]{6,20}$/;
 const newId = () => 'i' + crypto.randomUUID().replace(/-/g, '').slice(0, 14);
@@ -65,7 +65,7 @@ export class OverlayRoom extends DurableObject<Env> {
     // The Worker has already checked the display key or the session and role, and passes the result in these headers.
     const role = req.headers.get('x-mp-role') === 'control' ? 'control' : 'display';
     const att: Attachment = role === 'control'
-      ? { role, userId: req.headers.get('x-mp-user') || '', email: req.headers.get('x-mp-email') || '', roleName: (req.headers.get('x-mp-role-name') || 'viewer') as Role }
+      ? { role, userId: req.headers.get('x-mp-user') || '', email: req.headers.get('x-mp-email') || '', roleName: (req.headers.get('x-mp-role-name') || 'viewer') as Role, since: Date.now() }
       : { role, output: (req.headers.get('x-mp-output') || 'obs') as OutputId };
     const st = await this.load();
     const prof = req.headers.get('x-mp-org');
@@ -131,11 +131,15 @@ export class OverlayRoom extends DurableObject<Env> {
     const socks = this.ctx.getWebSockets().map((w) => w.deserializeAttachment() as Attachment);
     const displays: Record<string, number> = { obs: 0, freeshow: 0, stage: 0 };
     const controls: string[] = [];
+    const people: { email: string; role: string; since: number }[] = [];
     for (const a of socks) {
       if (a.role === 'display' && a.output) displays[a.output] = (displays[a.output] || 0) + 1;
-      if (a.role === 'control' && a.email && !controls.includes(a.email)) controls.push(a.email);
+      if (a.role === 'control' && a.email && !controls.includes(a.email)) {
+        controls.push(a.email);
+        people.push({ email: a.email, role: a.roleName || 'viewer', since: Math.min(...socks.filter((x) => x.email === a.email).map((x) => x.since || Date.now())) });
+      }
     }
-    const msg = { v: 1, type: 'presence', displays, controls };
+    const msg = { v: 1, type: 'presence', displays, controls, people };
     for (const ws of this.ctx.getWebSockets()) if ((ws.deserializeAttachment() as Attachment).role === 'control') this.sendTo(ws, msg);
   }
   private log(st: State, msg: string, by: string) {
@@ -194,12 +198,15 @@ export class OverlayRoom extends DurableObject<Env> {
   private take(st: State, id: string) {
     const it = st.items[id];
     if (!it) return;
-    it.live = { ...it.data };
-    if (it.comp === 'countdown') it.live.target = Date.now() + (Number(it.data.minutes) || 10) * 60000;
+    it.live = { ...it.data, page: 0 };
+    // A set time, the next weekly service, or minutes from Show, in the organisation's time zone.
+    if (it.comp === 'countdown') it.live.target = countdownTarget(it.data, this.profile?.tz, Date.now());
+    const emergency = isEmergency(it.n);
     for (const o of OUT_IDS) {
       const arr = st.onAir[o].filter((x) => x !== id);
       if (it.targets[o]) {
-        const same = arr.filter((x) => st.items[x]?.slot === it.slot);
+        // An emergency notice is never pushed off by ordinary graphics; only Hide / Clear (or another emergency) removes it.
+        const same = arr.filter((x) => st.items[x]?.slot === it.slot && (emergency || !isEmergency(st.items[x]!.n)));
         const lim = (MULTI as Record<string, number>)[it.slot] || 1;
         const drop = same.slice(0, Math.max(0, same.length - lim + 1));
         st.onAir[o] = arr.filter((x) => !drop.includes(x)).concat(id);
@@ -228,7 +235,8 @@ export class OverlayRoom extends DurableObject<Env> {
     for (const [k, v] of Object.entries(raw as Record<string, unknown>)) {
       if (!allowed.has(k)) continue;
       if (typeof v === 'number' && Number.isFinite(v)) out[k] = Math.max(-1e6, Math.min(1e6, v));
-      else if (typeof v === 'string') out[k] = v.slice(0, 2000);
+      // Whole songs and passages need more room; the room state is one stored value, so keep it bounded.
+      else if (typeof v === 'string') out[k] = v.slice(0, k === 'text' ? 6000 : 2000);
     }
     return out;
   }
@@ -302,6 +310,17 @@ export class OverlayRoom extends DurableObject<Env> {
         if (!need('operator') || !st.items[id]) return;
         const it = st.items[id]!; it.live = { ...it.data, ...(it.live.target ? { target: it.live.target } : {}) };
         this.log(st, 'Updated on air ' + this.label(st, id), by); break;
+      }
+      case 'page': {
+        // Next / previous page of a paged graphic (lyrics, Scripture) that is on air.
+        const it = st.items[id];
+        if (!need('operator') || !it) return;
+        const n = pagesOf(it, it.live).length;
+        const cur = Number(it.live.page) || 0;
+        const to = Math.min(n - 1, Math.max(0, cur + (Number(m.dir) < 0 ? -1 : 1)));
+        if (to === cur) return;
+        it.live = { ...it.live, page: to };
+        break;
       }
       case 'roGo': case 'next': case 'prev': {
         if (!need('operator') || !st.ro.length) return;

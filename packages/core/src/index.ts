@@ -51,4 +51,4 @@ export interface RoomState {
   updatedAt: number;
 }
 
-export const WRITE_MESSAGES = ['patch', 'take', 'clear', 'next', 'prev'] as const;
+export const WRITE_MESSAGES = ['patch', 'take', 'clear', 'next', 'prev', 'page'] as const;

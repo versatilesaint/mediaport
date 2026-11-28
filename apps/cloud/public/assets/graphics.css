@@ -129,3 +129,6 @@
 .reduce-motion .sweep{display:none}
 @keyframes gFade{from{opacity:0}}@keyframes gFadeOut{to{opacity:0}}
 .revoked{position:absolute;left:40px;bottom:40px;max-width:900px;padding:16px 22px;border-radius:12px;background:rgba(20,22,26,.82);color:#e5e7eb;font:500 24px/1.35 system-ui,-apple-system,'Segoe UI',sans-serif}
+.pg{display:inline-block;margin-left:14px;padding:2px 12px;border-radius:999px;font:600 .7em var(--f-ui);letter-spacing:.04em;background:color-mix(in srgb,var(--bl) 16%,transparent);color:var(--bl);vertical-align:middle}
+.lyl .box .pg{position:absolute;right:16px;bottom:10px;font-size:18px}
+[data-fit]{overflow:hidden}

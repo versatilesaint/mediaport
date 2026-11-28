@@ -31,6 +31,7 @@ export function orgProfile(org: Org): OrgProfile {
     loc: s.location || '',
     motto: s.motto || '',
     web: s.website || '',
+    tz: org.tz,
     depts: Array.isArray(s.departments) ? s.departments.filter((x) => typeof x === 'string').slice(0, 30) : [],
     lead: lead ?? [pack === 'church' ? 'Pastor' : 'Host', 'Add names in People'],
     brand: completeColors({ ...(s.brand && typeof s.brand === 'object' ? (s.brand as object) : {}), ...(cleanBrand(s.brand) ?? DEFAULT_BRAND) }),
