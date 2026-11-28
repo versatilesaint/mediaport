@@ -6,7 +6,9 @@ import type { Env } from './env';
 import { Invites, OrgScope, Platform, Users, type Org, type User } from './db';
 import { accessOk, currentUser, devSignIn, googleCallback, googleConfigured, googleStart, isPlatformOwnerEmail, safeNext, signOut } from './auth';
 import { randomToken } from './crypto';
-import { controlPage, displayPage, freeshowTestPage, homePage, message, platformPage, shellPage, signInPage } from './pages';
+import { controlPage, displayPage, freeshowTestPage, html, message, page, platformPage, shellPage, signInPage } from './pages';
+import { landingBody, sitePage } from './site';
+import { controlRoomBody, guidelinesBody, helpBody, kitsBody, platformMember, platformSignedOut } from './rooms';
 import { cleanBrand, DEFAULT_BRAND, orgProfile } from './profile';
 
 export { OverlayRoom } from './room';
@@ -74,6 +76,10 @@ async function platformGuard(req: Request, env: Env, user: User | null): Promise
 
 const room = (env: Env, org: Org) => env.ROOM.get(env.ROOM.idFromName(org.id));
 
+const FAVICONS = new Set(['/favicon.ico', '/favicon.svg', '/favicon-16x16.png', '/favicon-32x32.png', '/apple-touch-icon.png', '/android-chrome-192x192.png', '/android-chrome-512x512.png', '/site.webmanifest']);
+/** The landing page runs one script file and no inline script. */
+const SITE_CSP = "default-src 'self'; script-src 'self'; style-src 'self' 'unsafe-inline'; img-src 'self' data:; font-src 'self'; connect-src 'self'; frame-ancestors 'self'; base-uri 'none'; form-action 'self' https://accounts.google.com";
+
 export default {
   async fetch(req: Request, env: Env): Promise<Response> {
     const url = new URL(req.url);
@@ -85,10 +91,20 @@ export default {
     // ----- Public and auth -----
     if (url.pathname === '/healthz') return json({ ok: true });
     if (url.pathname.startsWith('/assets/')) return serveAsset(req, url.pathname);
-    if (url.pathname === '/') {
-      const orgs = user ? await Users.orgsFor(env.DB, user.id) : [];
-      return homePage(user, orgs, !!user && isPlatformOwnerEmail(env, user.email));
+    // ----- The website's rooms: Home, Control, Platform, Kits, Help, Guidelines -----
+    if (url.pathname === '/') return html(sitePage({ title: 'MediaPort · every clip, stream and slide', room: 'home', user, landing: true, body: landingBody(!!user), scriptSrc: '/assets/landing.js' }), 200, { 'content-security-policy': SITE_CSP });
+    if (FAVICONS.has(url.pathname)) return serveAsset(req, '/assets/brand' + url.pathname);
+    if (url.pathname === '/control') {
+      if (!user) return Response.redirect(`${url.origin}/platform?next=/control`, 302);
+      const orgs = await Users.orgsFor(env.DB, user.id);
+      const active = orgs.filter((o) => o.status === 'active');
+      // One organisation: straight into its studio. Several: choose.
+      if (orgs.length === 1 && active.length === 1) return Response.redirect(`${url.origin}/${active[0]!.slug}/control`, 302);
+      return page('Control · MediaPort', controlRoomBody(orgs), { user, room: 'control' });
     }
+    if (url.pathname === '/kits') return page('Kits · MediaPort', kitsBody(user ? await Users.orgsFor(env.DB, user.id) : null), { user, room: 'kits' });
+    if (url.pathname === '/help') return page('Help · MediaPort', helpBody(), { user, room: 'help' });
+    if (url.pathname === '/guidelines') return page('Guidelines · MediaPort', guidelinesBody(), { user, room: 'guidelines' });
     if (url.pathname === '/auth/signin') return signInPage(safeNext(url.searchParams.get('next')), googleConfigured(env));
     if (url.pathname === '/auth/google/start') return googleConfigured(env) ? googleStart(req, env) : message('Sign-in not set up', 'Google sign-in has not been configured yet.', 503);
     if (url.pathname === '/auth/google/callback') return googleConfigured(env) ? googleCallback(req, env) : notFound();
@@ -112,13 +128,15 @@ export default {
       return Response.redirect(`${url.origin}/${org.slug}/control`, 302);
     }
 
-    // ----- Platform (owner only) -----
-    if (parts[0] === 'platform') {
-      if (!user) return Response.redirect(`${url.origin}/auth/signin?next=/platform`, 302);
-      const denied = await platformGuard(req, env, user);
-      if (denied) return message('Platform owner only', 'This area is for the MediaPort platform owner.', 403, user);
-      return platformPage(user);
+    // ----- Platform room: sign in, your organisations; the platform owner also adds organisations -----
+    if (parts[0] === 'platform' && parts.length === 1) {
+      if (!user) return page('Platform · MediaPort', platformSignedOut(googleConfigured(env), safeNext(url.searchParams.get('next') || '/platform')), { room: 'platform' });
+      const orgs = await Users.orgsFor(env.DB, user.id);
+      const owner = isPlatformOwnerEmail(env, user.email) && (await accessOk(req, env));
+      if (owner) return platformPage(user, platformMember(user, orgs, true));
+      return page('Platform · MediaPort', platformMember(user, orgs, false), { user, room: 'platform' });
     }
+    if (parts[0] === 'platform') return notFound();
     if (parts[0] === 'api' && parts[1] === 'platform') {
       const denied = await platformGuard(req, env, user);
       if (denied) return denied;

@@ -6,7 +6,7 @@ import { createHash } from 'node:crypto';
 
 const root = new URL('../apps/cloud/public/', import.meta.url).pathname;
 const outFile = new URL('../apps/cloud/src/generated/assets.ts', import.meta.url).pathname;
-const TYPES = { '.js': 'text/javascript; charset=utf-8', '.css': 'text/css; charset=utf-8', '.woff2': 'font/woff2', '.txt': 'text/plain; charset=utf-8', '.svg': 'image/svg+xml' };
+const TYPES = { '.js': 'text/javascript; charset=utf-8', '.css': 'text/css; charset=utf-8', '.woff2': 'font/woff2', '.txt': 'text/plain; charset=utf-8', '.svg': 'image/svg+xml', '.png': 'image/png', '.ico': 'image/x-icon', '.webmanifest': 'application/manifest+json' };
 
 const walk = (d) => readdirSync(d).flatMap((f) => (statSync(join(d, f)).isDirectory() ? walk(join(d, f)) : [join(d, f)]));
 const entries = {};
@@ -16,7 +16,7 @@ for (const file of walk(root)) {
   if (!type) continue;
   const buf = readFileSync(file);
   total += buf.length;
-  const binary = !type.startsWith('text/') && type !== 'image/svg+xml';
+  const binary = !type.startsWith('text/') && type !== 'image/svg+xml' && !type.startsWith('application/manifest');
   entries['/' + relative(root, file).split('\\').join('/')] = {
     type,
     b64: binary,

@@ -182,7 +182,17 @@ single-tenant link token.
 
 ---
 
-## 5. Decisions needed from the owner
+## 5. Decisions (owner, 28 November 2026)
+
+**Decided:** approve all recommendations, with these corrections:
+- **D1 → one website, rooms with a shared navigation tab bar:** `/` landing page (the 3D header), `/control` the
+  studio, `/platform` signing in and adding organisations, `/kits` overlays, templates and downloads, plus **Help**
+  and **Guidelines** tabs. Existing `/{org}/control`, `/{org}/team` and `/{org}/o/...` links keep working.
+- **D2** keep the 227 numbers, grouped and numbered by category. **D3** free services only (GitHub Actions + R2).
+- **D4** Phase 1 first. **D5** screen keys stay copyable (stored as issued). **D6** keep direct Show for now
+  (Preview/Take in Phase 2). **D7** Help and Guidelines are their own tabs.
+
+### Options that were put to the owner
 
 - **D1 Addresses.** Keep `/{org}/control` and `/{org}/o/{output}?k=` (recommended), and add the spec's addresses as
   aliases? Or move to `/platform/studio/:id` and `/screen/...` with redirects from the old ones?
