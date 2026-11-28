@@ -1,0 +1,44 @@
+# Builds each organisation's broadcast kit in its own brand (studio spec §6), free on GitHub Actions.
+# Needs the repository secret KIT_BUILD_TOKEN (same value as the Worker secret). Without it, the job does nothing.
+name: Kit builder
+on:
+  schedule:
+    - cron: '17 * * * *'
+  workflow_dispatch:
+    inputs:
+      all:
+        description: Rebuild every organisation
+        type: boolean
+        default: false
+      only:
+        description: Only this organisation (slug)
+        required: false
+concurrency: { group: kit-build, cancel-in-progress: false }
+permissions: { contents: read }
+jobs:
+  build:
+    runs-on: ubuntu-latest
+    timeout-minutes: 120
+    env:
+      KIT_BUILD_TOKEN: ${{ secrets.KIT_BUILD_TOKEN }}
+      MEDIAPORT_URL: https://mediaport.koladelawal.org
+      ALL: ${{ inputs.all && '1' || '' }}
+      ONLY: ${{ inputs.only }}
+    steps:
+      - name: Check the token
+        id: tok
+        run: if [ -n "$KIT_BUILD_TOKEN" ]; then echo "ok=1" >> "$GITHUB_OUTPUT"; else echo "KIT_BUILD_TOKEN is not set; skipping."; fi
+      - uses: actions/checkout@v4
+        if: steps.tok.outputs.ok
+      - uses: actions/setup-node@v4
+        if: steps.tok.outputs.ok
+        with: { node-version: 22 }
+      - name: Install Playwright, Chromium and ffmpeg
+        if: steps.tok.outputs.ok
+        run: |
+          sudo apt-get update -qq && sudo apt-get install -y -qq ffmpeg
+          npm install --no-save --no-package-lock playwright@1.48.2
+          npx playwright install --with-deps chromium
+      - name: Build kits
+        if: steps.tok.outputs.ok
+        run: node kit/build.mjs

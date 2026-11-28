@@ -49,28 +49,44 @@ ${isOwner ? '' : `<p class="mut" style="margin-top:20px">Need a new organisation
 }
 
 // ---------------------------------------------------------------- Kits
-const KIT_ITEMS: [string, string, string][] = [
-  ['Templates', '227 on-air templates in 17 categories: lyrics, Scripture, sermon, names, announcements, camera overlays, live graphics, countdowns, giving, welcome, testimony, transitions, backgrounds, special overlays, stage display, branding and speaker timers.', 'In the studio now'],
-  ['Camera frames', '17 layouts with see-through windows (full, picture-in-picture, dual, split, triple, quad, camera + Scripture, lyrics, slides, interview, video call, vertical, borders, corners, announcement, countdown, camera IDs), in Bold and Flat looks, with OBS positions.', 'Coming next'],
-  ['Backgrounds', 'Motion backgrounds (standard and dark, 20-second loops) and still backgrounds at 1080p and 4K, in your brand colours.', 'Coming next'],
-  ['Stings and overlays', 'Intro sting (7 s), transition stinger (2.5 s, OBS cut at 1.2 s), animated corner logo and lower third, all transparent.', 'Coming next'],
-  ['OBS kit', 'A ready scene collection for Windows and Mac: Starting Soon, Intro, Live, Sermon, Announcements, Be Right Back, Ending and a scene per camera frame, with the stinger set up.', 'Coming next'],
-  ['FreeShow kit', 'Templates (lyrics, Scripture, announcement, sermon, welcome, livestream versions) and overlays to import in FreeShow 1.6.', 'Coming next'],
-  ['Countdown page', 'A stand-alone countdown to your next service for any screen or OBS, with your weekly schedule.', 'Coming next'],
+type KitRow = OrgRow & { kit?: { ready: { at: number; files: { name: string; size: number }[] } | null; current: boolean } | null };
+const KIT_GROUPS: [string, RegExp, string][] = [
+  ['Stings and overlays', /^(intro-sting|transition-stinger|corner-logo|lower-third)/, 'Transparent WebM (VP9 + alpha) for OBS and FreeShow, with still PNGs'],
+  ['Backgrounds', /^(bg-|still-)/, 'Motion loops (20 s) and stills at 1080p and 4K'],
+  ['Camera frames', /^frame-/, 'Transparent PNGs, Bold and Flat; the animated border as WebM'],
+  ['Other', /./, ''],
 ];
-export function kitsBody(orgs: OrgRow[] | null) {
-  const items = KIT_ITEMS.map(([t, d, s]) => `<div class="card tile"><div class="row" style="justify-content:space-between"><h3 style="margin:0">${esc(t)}</h3><span class="pill ${s.startsWith('In') ? 'teal' : 'orange'}">${esc(s)}</span></div><p class="mut" style="margin:0">${esc(d)}</p></div>`).join('');
+const size = (n: number) => (n > 1e6 ? (n / 1e6).toFixed(1) + ' MB' : Math.max(1, Math.round(n / 1e3)) + ' KB');
+function kitFiles(o: KitRow) {
+  const k = o.kit;
+  if (!k || !k.ready) return `<p class="mut" style="margin:0">Your kit is being made in your brand colours and logo. It appears here within the hour after your organisation is added or its brand changes.</p>`;
+  const groups = KIT_GROUPS.map(([title, re, note]) => {
+    const files = k.ready!.files.filter((f) => re.test(f.name) && !KIT_GROUPS.slice(0, KIT_GROUPS.findIndex((g) => g[0] === title)).some((g) => g[1].test(f.name)));
+    return files.length ? `<details class="faq"><summary>${esc(title)} · ${files.length} files</summary><div>${note ? `<p class="mut" style="font-size:14px">${esc(note)}</p>` : ''}<div class="tw"><table>${files.map((f) => `<tr><td class="mono">${esc(f.name)}</td><td class="mut">${size(f.size)}</td><td><a class="btn sm" href="/${esc(o.slug)}/kit/${esc(f.name)}" download>Download</a></td></tr>`).join('')}</table></div></div></details>` : '';
+  }).join('');
+  return `${k.current ? '' : `<p class="note" style="margin:0 0 8px">Your brand changed: a fresh kit is on its way (within the hour). These files use the previous brand.</p>`}<p class="mut" style="margin:0 0 8px;font-size:14px">Made ${new Date(k.ready.at).toLocaleString('en-GB', { dateStyle: 'medium', timeStyle: 'short' })}.</p>${groups}`;
+}
+const KIT_ITEMS: [string, string, string][] = [
+  ['Templates', '230 on-air templates in 17 categories, used live from the studio: lyrics, Scripture, sermon, names, announcements, camera overlays, live graphics, countdowns, giving, welcome, testimony, transitions, backgrounds, special overlays, stage display, branding and speaker timers.', 'In the studio'],
+  ['Camera frames', '17 layouts with see-through windows (full, picture-in-picture, dual, split, triple, quad, camera + Scripture, lyrics, slides, interview, video call, vertical, border, corners, announcement, countdown, camera IDs), Bold and Flat, with OBS positions in the studio.', 'In your kit'],
+  ['Backgrounds', 'Motion backgrounds (standard and dark, 20-second loops) and still backgrounds at 1080p and 4K, in your brand colours.', 'In your kit'],
+  ['Stings and overlays', 'Intro sting (7 s), transition stinger (2.5 s, OBS cut at 1.2 s), animated corner logo (12 s loop) and lower third (8 s loop, no text baked in), all transparent.', 'In your kit'],
+  ['OBS kit', 'A ready scene collection for Windows and Mac with a scene per camera frame and the stinger set up.', 'Coming next'],
+  ['FreeShow kit', 'Templates and overlays to import in FreeShow 1.6.', 'Coming next'],
+];
+export function kitsBody(orgs: KitRow[] | null) {
+  const items = KIT_ITEMS.map(([t, d, s]) => `<div class="card tile"><div class="row" style="justify-content:space-between"><h3 style="margin:0">${esc(t)}</h3><span class="pill ${s.startsWith('Coming') ? 'orange' : 'teal'}">${esc(s)}</span></div><p class="mut" style="margin:0">${esc(d)}</p></div>`).join('');
   const yours = orgs === null
-    ? `<div class="card"><p class="mut" style="margin:0">Sign in to see your organisation's kit. <a href="/platform">Sign in</a></p></div>`
+    ? `<div class="card"><p class="mut" style="margin:0">Sign in to download your organisation's kit. <a href="/platform">Sign in</a></p></div>`
     : orgs.length
-      ? `<div class="cols">${orgs.map((o) => `<div class="card tile"><h3 style="margin:0">${esc(o.name)}</h3><span class="mut mono">/${esc(o.slug)}</span><p class="mut" style="margin:0">Your kit is generated in your organisation's brand colours and logo. Downloads appear here when it's ready.</p><a class="btn sm" href="/${esc(o.slug)}/control">${ICON.control}Use the templates in the studio</a></div>`).join('')}</div>`
+      ? `<div class="grid">${orgs.map((o) => `<div class="card"><div class="row" style="justify-content:space-between;margin-bottom:8px"><h3 style="margin:0">${esc(o.name)}</h3><a class="btn sm" href="/${esc(o.slug)}/team#brand">${ICON.brand}Brand</a></div>${kitFiles(o)}</div>`).join('')}</div>`
       : `<div class="card"><p class="mut" style="margin:0">Join an organisation to get its kit.</p></div>`;
   return `${roomHead('kits', 'Kits', 'Broadcast kits', 'Everything your media team needs on the OBS and FreeShow computers, made in your own brand.')}
 <h2 style="margin-top:8px">Your kits</h2>${yours}
 <h2>What's in a kit</h2><div class="cols">${items}</div>
 <h2>Screens you can use today</h2>
 <div class="cols">
-  <div class="card tile"><h3 style="margin:0">OBS</h3><p class="mut" style="margin:0">Add a <b>Browser Source</b>, paste your OBS screen link, width 1920, height 1080. Untick “Shutdown source when not visible”.</p></div>
+  <div class="card tile"><h3 style="margin:0">OBS</h3><p class="mut" style="margin:0">Add a <b>Browser Source</b>, paste your OBS screen link, width 1920, height 1080. Untick “Shutdown source when not visible”. Camera frames: put your cameras under the Browser Source; the studio shows where.</p></div>
   <div class="card tile"><h3 style="margin:0">FreeShow</h3><p class="mut" style="margin:0">Add a <b>Website</b> item to a slide and paste your FreeShow screen link. Transparency works (tested on FreeShow for Mac).</p><a class="btn sm" href="/test/freeshow">Transparency test page</a></div>
   <div class="card tile"><h3 style="margin:0">Stage</h3><p class="mut" style="margin:0">Open the Stage link full-screen on the pulpit screen or a tablet: the speaker timer and what's next.</p></div>
 </div>`;
@@ -79,7 +95,7 @@ export function kitsBody(orgs: OrgRow[] | null) {
 // ---------------------------------------------------------------- Help
 export function helpBody() {
   return `${roomHead('help', 'Help', 'How to use MediaPort', 'Short guides for the media team. Start at the top if you are new.')}
-<ul class="toc"><li><a href="#start">Getting started</a></li><li><a href="#invites">Invites and roles</a></li><li><a href="#screens">Screen links</a></li><li><a href="#obs">OBS</a></li><li><a href="#freeshow">FreeShow</a></li><li><a href="#studio">The studio</a></li><li><a href="#paging">Songs and pages</a></li><li><a href="#countdowns">Countdowns</a></li><li><a href="#emergency">Emergency</a></li><li><a href="#timer">Speaker timer</a></li><li><a href="#keys">Keyboard</a></li><li><a href="#trouble">When something goes wrong</a></li></ul>
+<ul class="toc"><li><a href="#start">Getting started</a></li><li><a href="#invites">Invites and roles</a></li><li><a href="#screens">Screen links</a></li><li><a href="#obs">OBS</a></li><li><a href="#freeshow">FreeShow</a></li><li><a href="#studio">The studio</a></li><li><a href="#paging">Songs and pages</a></li><li><a href="#countdowns">Countdowns</a></li><li><a href="#frames">Camera frames</a></li><li><a href="#kit">Your kit</a></li><li><a href="#emergency">Emergency</a></li><li><a href="#timer">Speaker timer</a></li><li><a href="#keys">Keyboard</a></li><li><a href="#trouble">When something goes wrong</a></li></ul>
 
 <h2 id="start">Getting started</h2>
 <ol class="steps">
@@ -128,6 +144,12 @@ export function helpBody() {
 <h2 id="countdowns">Countdowns</h2>
 <p>A countdown can run for a number of minutes from Show, to a set time (<code>18:00</code> today, or <code>2026-12-24 18:00</code>), or to the next service in a weekly schedule (<code>Sun 10:30, Wed 19:00</code>). Times use your organisation's time zone, including clock changes.</p>
 
+<h2 id="frames">Camera frames</h2>
+<p>Camera overlays include 17 frames with see-through windows: full, picture-in-picture, dual, split, triple, quad, camera with Scripture, lyrics, slides, interview, video call, vertical, live border, corners, announcement, countdown and camera IDs. Choose <b>Bold</b> or <b>Flat</b>, and change the margin, gap, sizes and labels in the editor.</p>
+<p>Under the editor, <b>OBS positions</b> lists where each camera goes on the 1920×1080 canvas. Copy the numbers into the camera source's <i>Edit Transform</i> in OBS (Position, then Size), and put the MediaPort browser source above the cameras.</p>
+<h2 id="kit">Your kit</h2>
+<p>Kits shows files made in your own colours and logo: motion and still backgrounds, the intro sting, the transition stinger, the corner logo, the lower third and every camera frame as a PNG. They are rebuilt automatically within the hour after you change your brand.</p>
+<p>Stinger in OBS: add a <i>Stinger</i> transition, choose <span class="mono">transition-stinger.webm</span>, and set the transition point to 1200 ms.</p>
 <h2 id="emergency">Emergency notices</h2>
 <p>The Emergency Notice (#183) goes to every screen and stays on top. Other graphics never push it off; only Hide or Clear removes it.</p>
 

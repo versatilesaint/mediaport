@@ -5,7 +5,9 @@ node "$(dirname "$0")/build-assets.mjs"
 cd "$(dirname "$0")/../apps/cloud"
 rm -rf .wrangler/state
 # Local-only settings. ENVIRONMENT=dev enables /auth/dev on localhost; never set it in production.
-printf 'ENVIRONMENT=dev\nSESSION_SECRET=%s\nPLATFORM_OWNERS=owner@platform.test\n' "$(node -e "console.log(require('crypto').randomBytes(32).toString('hex'))")" > .dev.vars
+rnd() { node -e "console.log(require('crypto').randomBytes(32).toString('hex'))"; }
+KIT_BUILD_TOKEN="$(rnd)"; export KIT_BUILD_TOKEN
+printf 'ENVIRONMENT=dev\nSESSION_SECRET=%s\nPLATFORM_OWNERS=owner@platform.test\nKIT_BUILD_TOKEN=%s\n' "$(rnd)" "$KIT_BUILD_TOKEN" > .dev.vars
 npx wrangler d1 migrations apply mediaport --local >/dev/null
 PORT="${PORT:-8787}"
 if curl -s "http://127.0.0.1:$PORT/healthz" >/dev/null 2>&1; then echo "Port $PORT is already in use. Stop the other server first." >&2; exit 1; fi

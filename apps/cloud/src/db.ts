@@ -35,6 +35,15 @@ export const Platform = {
     return parseOrg(await db.prepare('SELECT * FROM orgs WHERE slug = ?').bind(slug).first<OrgRow>());
   },
 
+  /** Active organisations with their settings, for the kit builder (brand colours and logos only leave through kit.ts). */
+  async activeOrgs(db: D1Database): Promise<Org[]> {
+    const r = await db.prepare("SELECT * FROM orgs WHERE status = 'active' ORDER BY created_at").all<OrgRow>();
+    return (r.results ?? []).map((x) => parseOrg(x)!);
+  },
+  async orgById(db: D1Database, id: string): Promise<Org | null> {
+    return parseOrg(await db.prepare('SELECT * FROM orgs WHERE id = ?').bind(id).first<OrgRow>());
+  },
+
   /** Metadata and usage only. The platform owner can't read an organisation's content unless invited (brief §3.3). */
   async listOrgs(db: D1Database) {
     const r = await db

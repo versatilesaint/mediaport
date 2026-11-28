@@ -1,0 +1,23 @@
+<!doctype html>
+<html><head><meta charset="utf-8"><title>MediaPort kit frames</title>
+<link rel="stylesheet" href="/assets/graphics.css">
+<style>html,body{margin:0;width:1920px;height:1080px;background:transparent;overflow:hidden}#cv{position:absolute;left:0;top:0;width:1920px;height:1080px}
+/* Kit PNGs: labels and panel text are added in OBS / FreeShow, so only the frame itself is drawn. */
+.flab,.fpn>*{display:none!important}.g{animation:none!important}</style></head>
+<body><div id="cv"></div>
+<script type="module">
+// Renders one camera frame with the studio's own renderer (catalog.js frameHTML), so kit PNGs match the live frames.
+import { T, sample, frameHTML, brandVars } from '/assets/catalog.js';
+const q = new URLSearchParams(location.search);
+const B = window.__B;
+const n = Number(q.get('n')), look = q.get('look') || 'bold';
+const org = { brand: B.brand, kit: { logos: B.logo ? { full_light: B.logo, mark_light: B.mark || B.logo } : {}, theme: B.theme, motion: B.motion }, loc: '', web: '' };
+const cv = document.getElementById('cv');
+cv.style.cssText += ';' + brandVars(org);
+cv.innerHTML = `<div class="g frm2" style="position:absolute;inset:0">${frameHTML({ n, comp: 'frame', slot: 'frame', live: {} }, { ...sample(T(n), org), look, label1: '', label2: '', label3: '', label4: '' }, org)}</div>`;
+window.SIZE = { w: 1920, h: 1080 };
+window.DURATION = 6;
+window.renderAt = (t) => document.getAnimations().forEach((a) => { a.pause(); a.currentTime = t * 1000; });
+await document.fonts.ready;
+window.sceneReady = true;
+</script></body></html>
