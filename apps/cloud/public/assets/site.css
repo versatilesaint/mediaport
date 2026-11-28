@@ -149,3 +149,14 @@ details.faq>div{padding:0 0 16px}
 .rooms-strip b{font:700 17px var(--font)}
 .rooms-strip span{font-size:14px;color:#a9b4c0;line-height:20px}
 @media (max-width:700px){.rooms-strip{padding:8px 16px 48px}}
+/* Kit previews (studio spec §8.3): each overlay on a checkerboard, the lyrics background and black */
+.kprev{display:grid;gap:14px;margin:0 0 14px}
+.kprev figure{margin:0}
+.kprev figcaption{font-size:14px;color:var(--muted,#8a97a6);margin:0 0 6px}
+.kp3{display:grid;grid-template-columns:repeat(3,1fr);gap:8px}
+.kp{aspect-ratio:16/9;border-radius:10px;overflow:hidden;border:1px solid var(--hairline);display:grid;place-items:center;background-size:cover;background-position:center}
+.kp img{max-width:100%;max-height:100%;object-fit:contain}
+.kp.ck{background:repeating-conic-gradient(#9aa3ad 0 25%,#d5dae0 0 50%) 0 0/20px 20px}
+.kp.ly{background-color:#1b2633}
+.kp.bk{background:#000}
+@media (max-width:560px){.kp3{grid-template-columns:1fr}}

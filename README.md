@@ -6,7 +6,7 @@ Live: https://mediaport.koladelawal.org
 
 ## Website rooms
 `/` Home (3D landing) · `/control` your studio · `/platform` sign in, organisations, team, screen links, brand · `/kits` broadcast kits · `/help` · `/guidelines`.
-Studio spec: `docs/MEDIAPORT_STUDIO_BUILD.md`; audit and progress: `docs/STUDIO_AUDIT.md` (Phases 1–3 done).
+Studio spec: `docs/MEDIAPORT_STUDIO_BUILD.md`; audit and progress: `docs/STUDIO_AUDIT.md` (Phases 1–4 done).
 
 ## Status: Phase 1a in progress
 - Control room (MediaPort OS) at `/{org}/control`: 227-template library, editor, running order, speaker timer, live OBS / FreeShow / Stage previews, 30 shell themes.
@@ -20,8 +20,8 @@ Studio spec: `docs/MEDIAPORT_STUDIO_BUILD.md`; audit and progress: `docs/STUDIO_
 - FreeShow transparency test page at `/test/freeshow` (see `docs/SETUP-FREESHOW.md`).
 - Isolation tests: `npm test`.
 
-## Broadcast kits (Phase 3)
-`kit/build.mjs` renders each organisation's kit in its own brand and uploads it to R2 through the Worker. It runs free on GitHub Actions every hour (`.github/workflows/kit-build.yml`) and needs the secret `KIT_BUILD_TOKEN` (32+ random characters) set both as a Worker secret and as a GitHub repository secret. Local run: `KIT_BUILD_TOKEN=… MEDIAPORT_URL=http://127.0.0.1:8787 FAST=1 node kit/build.mjs` (needs Playwright and ffmpeg).
+## Broadcast kits (Phases 3–4)
+`kit/build.mjs` renders each organisation's kit in its own brand, packages it (`kit/package.mjs`: OBS scene collections for Windows and Mac, FreeShow templates and overlays, countdown page, four ZIPs) and uploads it to R2 through the Worker. It runs free on GitHub Actions every hour (`.github/workflows/kit-build.yml`) and needs the secret `KIT_BUILD_TOKEN` (32+ random characters) set both as a Worker secret and as a GitHub repository secret. Local run: `KIT_BUILD_TOKEN=… MEDIAPORT_URL=http://127.0.0.1:8787 FAST=1 node kit/build.mjs` (needs Playwright and ffmpeg).
 
 ## Layout
 - `apps/cloud`: Worker, Durable Object, D1 migrations.

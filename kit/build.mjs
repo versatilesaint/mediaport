@@ -17,6 +17,7 @@ import { spawn } from 'node:child_process';
 import { fileURLToPath } from 'node:url';
 import { chromium } from 'playwright';
 import { FRAME_IDS, FRAME_OF, FRAME_NAME, obsPositions } from '../apps/cloud/public/assets/frames.js';
+import { packageKit } from './package.mjs';
 
 const HERE = dirname(fileURLToPath(import.meta.url));
 const ASSETS = join(HERE, '../apps/cloud/public/assets');
@@ -113,6 +114,15 @@ async function build(browser, job) {
     while (queue.length) { const item = queue.shift(); await render(browser, B, item, dir); done.push(item[0]); console.log(`  ${job.slug}/${item[0]}`); }
   }));
   done.sort();
+  const files = new Map();
+  for (const n of done) files.set(n, await readFile(join(dir, n)));
+  const logos = [];
+  for (const [v, url] of Object.entries(job.logos || {})) {
+    const r = await fetch(url);
+    if (r.ok) logos.push([v, (r.headers.get('content-type') || 'image/png').split('/')[1].replace('jpeg', 'jpg').replace('svg+xml', 'svg').replace(/[^a-z]/g, ''), Buffer.from(await r.arrayBuffer())]);
+  }
+  const kit = packageKit(job, files, logos, { maxZip: 95_000_000 });
+  for (const [n, buf] of kit.zips) { await writeFile(join(dir, n), buf); done.push(n); console.log(`  ${job.slug}/${n} ${(buf.length / 1e6).toFixed(1)} MB`); }
   await writeFile(join(dir, 'kit.json'), manifest(job, done));
   const names = [...done, 'kit.json'];
   for (const name of names) {
@@ -126,17 +136,20 @@ async function build(browser, job) {
   if (process.env.OUT) { await mkdir(join(process.env.OUT, job.slug), { recursive: true }); for (const n of names) await writeFile(join(process.env.OUT, job.slug, n), await readFile(join(dir, n))); }
   await rm(dir, { recursive: true, force: true });
   console.log(`${job.slug}: kit ready (${names.length} files)`);
+  summary.push(`${job.slug} ready`);
 }
 
 let failed = 0;
+const summary = [];
+const report = async () => { if (process.env.KIT_SUMMARY) await writeFile(process.env.KIT_SUMMARY, summary.join('; ').slice(0, 135) || 'nothing to do'); };
 try {
   const r = await api('/jobs' + (process.env.ALL === '1' ? '?all=1' : ''));
-  if (!r.ok) throw new Error(`jobs: ${r.status} ${await r.text()}`);
+  if (!r.ok) { summary.push(r.status === 401 ? 'token rejected: the GitHub and Cloudflare KIT_BUILD_TOKEN differ' : `site answered ${r.status}`); throw new Error(`jobs: ${r.status} ${(await r.text()).slice(0, 200)}`); }
   let { jobs } = await r.json();
   if (process.env.ONLY) jobs = jobs.filter((j) => j.slug === process.env.ONLY);
-  if (!jobs.length) console.log('Every kit is up to date.');
+  if (!jobs.length) { console.log('Every kit is up to date.'); summary.push('token OK, every kit up to date'); }
   const browser = jobs.length ? await chromium.launch() : null;
-  for (const job of jobs) { try { await build(browser, job); } catch (e) { failed++; console.error(e.message); } }
+  for (const job of jobs) { try { await build(browser, job); } catch (e) { failed++; summary.push(`${job.slug} failed`); console.error(e.message); } }
   await browser?.close();
-} finally { server.close(); }
+} catch (e) { failed++; console.error(e.message); } finally { server.close(); await report(); }
 process.exit(failed ? 1 : 0);

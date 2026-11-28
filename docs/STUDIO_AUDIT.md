@@ -319,3 +319,17 @@ Still to do in later phases: per-template layouts for the remaining generic temp
 | Tests | `tests/frames.test.mjs`, `tests/kit.test.mjs`; builder run end to end against a local Worker (55 files) |
 
 Owner action: set `KIT_BUILD_TOKEN` (any random 32+ character value) as a Worker secret (`npx wrangler secret put KIT_BUILD_TOKEN` in `apps/cloud`) and as a GitHub repository secret with the same name. Until both are set the kit builder does nothing.
+
+## Phase 4: Broadcast Kit (done)
+
+| Spec item | Result |
+|---|---|
+| ZIPs (§8) | `<Short>-Broadcast-Kit.zip` (everything), `-OBS-Kit.zip`, `-FreeShow-Kit.zip`, `-Camera-Frames.zip`, one `<Short>/` folder with `README.txt`, `obs/`, `freeshow/`, `backgrounds/` + `backgrounds/4K/`, `overlays/`, `frames/` + `frames/freeshow/`, `brand/`. A ZIP over 95 MB is skipped (upload limit) and the others still download |
+| OBS scene collection (§8.1) | `kit/package.mjs`: Windows (`C:/<Short>`) and Mac (`/Users/Shared/<Short>`) JSON; shared sources Camera 1–4, Slides, Guest, Studio Graphics (browser source for the OBS screen link), Countdown, `[Overlay] Corner Logo`, `[Overlay] Lower Third` (hidden in Live); 8 main scenes + 17 `Frame • …` scenes with cameras placed and cropped to each window (27 scenes); Brand Stinger at 1200 ms. Every source reference and media path is checked against the kit before upload |
+| FreeShow 1.6 (§8.2) | 8 templates (Lyrics, Lyrics – Livestream, Scripture, Scripture – Motion, Scripture – Livestream, Announcement, Sermon, Welcome) and overlays (corner logo animated + static, lower third, intro and transition stings, 34 frames), in the organisation's colours and fonts. Tests replay FreeShow's import path rewrite for Windows and Mac |
+| countdown.html | Branded, schedule at the top (`day: 0` = Sunday, 24-hour), `?t=HH:MM` override, text set safely |
+| Kit page (§8.3) | ZIP buttons; corner logo, lower third and a frame previewed on transparent, the lyrics background and black; file tables with sizes; five-step setup guide ending with a practice run |
+| Builder status | The workflow posts a "Kit builder" commit status (token OK / token rejected / kits built), and rebuilds every kit when the kit code changes |
+| Tests | `tests/kit-package.test.mjs` (OBS references and paths, camera positions = OBS positions box, FreeShow import replay, ZIP contents, countdown); builder run end to end against a local Worker |
+
+Not possible here: importing into a real OBS 30+ and FreeShow 1.6. The generators follow the formats proven in the sister kit; please do the practice run on the media computers.

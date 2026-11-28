@@ -4,6 +4,9 @@ name: Kit builder
 on:
   schedule:
     - cron: '17 * * * *'
+  push:
+    branches: [main]
+    paths: ['kit/**', 'apps/cloud/public/assets/frames.js', 'apps/cloud/public/assets/catalog.js', 'apps/cloud/public/assets/graphics.css', '.github/workflows/kit-build.yml']
   workflow_dispatch:
     inputs:
       all:
@@ -14,7 +17,7 @@ on:
         description: Only this organisation (slug)
         required: false
 concurrency: { group: kit-build, cancel-in-progress: false }
-permissions: { contents: read }
+permissions: { contents: read, statuses: write }
 jobs:
   build:
     runs-on: ubuntu-latest
@@ -22,7 +25,9 @@ jobs:
     env:
       KIT_BUILD_TOKEN: ${{ secrets.KIT_BUILD_TOKEN }}
       MEDIAPORT_URL: https://mediaport.koladelawal.org
-      ALL: ${{ inputs.all && '1' || '' }}
+      # A push changes how kits are drawn, so every organisation's kit is rebuilt.
+      ALL: ${{ (github.event_name == 'push' || inputs.all) && '1' || '' }}
+      KIT_SUMMARY: /tmp/kit-summary.txt
       ONLY: ${{ inputs.only }}
     steps:
       - name: Check the token
@@ -40,5 +45,17 @@ jobs:
           npm install --no-save --no-package-lock playwright@1.48.2
           npx playwright install --with-deps chromium
       - name: Build kits
+        id: build
         if: steps.tok.outputs.ok
         run: node kit/build.mjs
+      # The result as a commit status on the commit that ran ("Kit builder"), so it shows on GitHub.
+      - name: Report
+        if: always()
+        env:
+          GH_TOKEN: ${{ github.token }}
+          OUTCOME: ${{ steps.tok.outputs.ok && steps.build.outcome || 'skipped' }}
+        run: |
+          if [ "$OUTCOME" = "skipped" ]; then STATE=error; DESC="KIT_BUILD_TOKEN is not set in GitHub secrets";
+          else DESC="$(cat "$KIT_SUMMARY" 2>/dev/null || echo "$OUTCOME")"; [ "$OUTCOME" = "success" ] && STATE=success || STATE=failure; fi
+          gh api "repos/$GITHUB_REPOSITORY/statuses/$GITHUB_SHA" -f state="$STATE" -f context="Kit builder" -f description="${DESC:0:139}" \
+            -f target_url="$GITHUB_SERVER_URL/$GITHUB_REPOSITORY/actions/runs/$GITHUB_RUN_ID" >/dev/null

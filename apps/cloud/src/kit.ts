@@ -6,9 +6,9 @@ import { OrgScope, Platform, type Org } from './db';
 import type { Env } from './env';
 import { orgProfile } from './profile';
 
-export const KIT_FILE = /^[a-z0-9][a-z0-9-]{0,60}\.(webm|png|jpg|json)$/;
-const TYPES: Record<string, string> = { webm: 'video/webm', png: 'image/png', jpg: 'image/jpeg', json: 'application/json' };
-export const MAX_KIT_FILE = 60_000_000;
+export const KIT_FILE = /^[a-z0-9][a-z0-9-]{0,60}\.(webm|png|jpg|json|zip)$/;
+const TYPES: Record<string, string> = { webm: 'video/webm', png: 'image/png', jpg: 'image/jpeg', json: 'application/json', zip: 'application/zip' };
+export const MAX_KIT_FILE = 96_000_000;
 
 export interface KitAssets { hash: string; at: number; files: { name: string; size: number }[] }
 export const kitAssets = (org: Org): KitAssets | null => {
@@ -19,7 +19,7 @@ export const kitAssets = (org: Org): KitAssets | null => {
 /** What the kit depends on: names, mark, colours, look, motion, fonts and logo versions. */
 export async function brandHash(org: Org): Promise<string> {
   const p = orgProfile(org);
-  const basis = JSON.stringify({ v: 1, name: p.name, short: p.short, mk: p.mk, brand: p.brand, kit: { theme: p.kit?.theme, motion: p.kit?.motion, fonts: p.kit?.fonts, logos: p.kit?.logos } });
+  const basis = JSON.stringify({ v: 2, name: p.name, short: p.short, mk: p.mk, brand: p.brand, kit: { theme: p.kit?.theme, motion: p.kit?.motion, fonts: p.kit?.fonts, logos: p.kit?.logos } });
   const d = await crypto.subtle.digest('SHA-256', new TextEncoder().encode(basis));
   return [...new Uint8Array(d)].slice(0, 8).map((b) => b.toString(16).padStart(2, '0')).join('');
 }
@@ -96,10 +96,15 @@ export async function kitDownload(env: Env, org: Org, name: string): Promise<Res
   const obj = await env.MEDIA.get(`orgs/${org.id}/kit/${k.hash}/${name}`);
   if (!obj) return new Response('Not found', { status: 404 });
   return new Response(obj.body, { headers: {
-    'content-type': obj.httpMetadata?.contentType || 'application/octet-stream', 'content-disposition': `attachment; filename="${org.slug}-${name}"`,
+    'content-type': obj.httpMetadata?.contentType || 'application/octet-stream', 'content-disposition': `attachment; filename="${downloadName(org, name)}"`,
     'cache-control': 'private, max-age=300', 'x-content-type-options': 'nosniff',
   } });
 }
+
+const ZIP_NAMES: Record<string, string> = { 'broadcast-kit.zip': 'Broadcast-Kit', 'obs-kit.zip': 'OBS-Kit', 'freeshow-kit.zip': 'FreeShow-Kit', 'camera-frames.zip': 'Camera-Frames' };
+/** The kit's folder name (kit/package.mjs folderName): the short name in letters, digits and hyphens. */
+export const kitFolder = (org: Org) => { const p = orgProfile(org); return String(p.short || p.name || '').normalize('NFKD').replace(/[\u0300-\u036f]/g, '').replace(/[^A-Za-z0-9]+/g, '-').replace(/^-+|-+$/g, '').slice(0, 32) || 'MediaPort'; };
+const downloadName = (org: Org, name: string) => (ZIP_NAMES[name] ? `${kitFolder(org)}-${ZIP_NAMES[name]}.zip` : `${org.slug}-${name}`);
 
 /** Kit status for the Kits room. */
 export async function kitStatus(org: Org): Promise<{ ready: KitAssets | null; current: boolean }> {
