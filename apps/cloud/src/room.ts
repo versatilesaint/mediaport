@@ -200,7 +200,7 @@ export class OverlayRoom extends DurableObject<Env> {
     if (!it) return;
     it.live = { ...it.data, page: 0 };
     // A set time, the next weekly service, or minutes from Show, in the organisation's time zone.
-    if (it.comp === 'countdown') it.live.target = countdownTarget(it.data, this.profile?.tz, Date.now());
+    if (it.comp === 'countdown' || it.n === 230) it.live.target = countdownTarget(it.data, this.profile?.tz, Date.now());
     const emergency = isEmergency(it.n);
     for (const o of OUT_IDS) {
       const arr = st.onAir[o].filter((x) => x !== id);
