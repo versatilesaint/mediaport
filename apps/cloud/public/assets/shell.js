@@ -1,6 +1,6 @@
 // MediaPort OS control shell (brief §7, §7.1). Talks to the organisation's room over one WebSocket.
 // All on-air changes go through the room; this page only keeps local view state (selection, windows, theme).
-import {esc,TPL,T,CATS,SM,OUTS,PEOPLE,FIELDS,PACKS,PH,PHUI,fmt,tmrEl,tmrRem,tmrPhase,tmrText,brandVars,G,reconcile,listFor,tplLabel,sample,defTargets,clock,now} from '/assets/catalog.js';
+import {esc,TPL,T,CATS,SM,OUTS,PEOPLE,FIELDS,PACKS,PH,PHUI,fmt,tmrEl,tmrRem,tmrPhase,tmrText,brandVars,G,reconcile,listFor,tplLabel,sample,defTargets,clock,now,pagesOf,pageIdx,fit} from '/assets/catalog.js';
 
 const $=(s,r=document)=>r.querySelector(s), $$=(s,r=document)=>[...r.querySelectorAll(s)];
 const store={get(k,d){try{const v=localStorage.getItem('mpos.'+k);return v==null?d:JSON.parse(v)}catch(e){return d}},set(k,v){try{localStorage.setItem('mpos.'+k,JSON.stringify(v))}catch(e){}}};
@@ -152,7 +152,7 @@ function setConn(rtt){const c=$('#conn');if(!c) return;const n=OUTS.reduce((a,[o
   c.dataset.mode=ONLINE?'online':'hub';if(rtt) lastRT=rtt;
   $('#connTxt').textContent=ONLINE?`Online · Cloud · ${n} screen${n===1?'':'s'}`:'Reconnecting…';$('#connS').textContent=ONLINE?String(n):'…';
   c.title=ONLINE?`Connected to the ${PROFILE.short} room${lastRT?` · ${lastRT} ms`:''}`:'Trying to reconnect';
-  const av=$('.avs');if(av){const list=(PRES.controls||[]).slice(0,4);av.innerHTML=list.map(e=>`<span class="av" title="${esc(e)}">${esc(e.slice(0,2).toUpperCase())}</span>`).join('');av.title=(PRES.controls||[]).join(', ')}
+  const av=$('.avs');if(av){const ppl=PRES.people||(PRES.controls||[]).map(e=>({email:e}));const t=p=>p.email+(p.role?' · '+p.role:'')+(p.since?' · since '+new Date(p.since).toLocaleTimeString('en-GB',{hour:'2-digit',minute:'2-digit'}):'');av.innerHTML=ppl.slice(0,4).map(p=>`<span class="av" title="${esc(t(p))}">${esc(p.email.slice(0,2).toUpperCase())}</span>`).join('')+(ppl.length>4?`<span class="av">+${ppl.length-4}</span>`:'');av.title=ppl.map(t).join('\n')}
   OUTS.forEach(([o])=>$$(`[data-lat="${o}"]`).forEach(e=>{const k=PRES.displays?.[o]||0;e.textContent=ONLINE?`${k} screen${k===1?'':'s'}${lastRT?' · '+lastRT+' ms':''}`:'offline'}))}
 
 let sigRO='',sigTM='',sigOUT='';
@@ -377,8 +377,8 @@ document.addEventListener('click',async e=>{
     case 'take':if(it) send({type:'take',itemId:it.id});break;
     case 'clear':if(it) send({type:'clear',itemId:it.id});break;
     case 'clear-out':send({type:'clearOut',output:a.dataset.out});break;
-    case 'next':if(s.ro.length){SEL=s.ro[Math.min(s.ro.length-1,s.roIdx+1)]?.id||SEL;send({type:'next'});renderEditor()}break;
-    case 'prev':if(s.ro.length){SEL=s.ro[Math.max(0,s.roIdx-1)]?.id||SEL;send({type:'prev'});renderEditor()}break;
+    case 'next':if(pageMove(1)) break;if(s.ro.length){SEL=s.ro[Math.min(s.ro.length-1,s.roIdx+1)]?.id||SEL;send({type:'next'});renderEditor()}break;
+    case 'prev':if(pageMove(-1)) break;if(s.ro.length){SEL=s.ro[Math.max(0,s.roIdx-1)]?.id||SEL;send({type:'prev'});renderEditor()}break;
     case 'ro-go':{const i=+a.dataset.i;SEL=s.ro[i]?.id||SEL;send({type:'roGo',i});renderEditor();break}
     case 'ro-add':if(it&&!s.ro.some(r=>r.id===it.id)){send({type:'ro.add',itemId:it.id});toast('Added to running order',tplLabel(it))}break;
     case 'sel-tpl':selTpl(+a.dataset.tpl);break;
@@ -443,16 +443,19 @@ document.addEventListener('change',e=>{
   if(e.target.id==='livetype'){const it=st().items[SEL];if(it) send({type:'item.upsert',item:{id:it.id,liveTyping:e.target.checked}})}
 });
 document.addEventListener('pointermove',e=>{const c=e.target.closest('.tcard');if(c){const r=c.getBoundingClientRect();c.style.setProperty('--mx',(e.clientX-r.left)+'px');c.style.setProperty('--my',(e.clientY-r.top)+'px')}},{passive:true});
+/** Next / Prev: page through the selected on-air lyric or passage first, then move along the running order. */
+function pageMove(dir){const s=S;const it=SEL&&s&&s.items[SEL];if(!it||!isOn(s,it.id)) return false;const n=pagesOf(it,it.live).length,cur=pageIdx(it,it.live);
+  if((dir>0&&cur<n-1)||(dir<0&&cur>0)){send({type:'page',itemId:it.id,dir});return true}return false}
 document.addEventListener('keydown',e=>{
   if((e.ctrlKey||e.metaKey)&&e.key.toLowerCase()==='k'){e.preventDefault();openPalette();return}
   if(e.target.closest('input,textarea,select')||$('.scrim')) return;
   if(!can('operator')) return;
   const s=st(),it=s.items[SEL];
   const go=i=>{if(i<0||i>=s.ro.length) return;SEL=s.ro[i].id;send({type:'roGo',i});renderEditor()};
-  if(e.key===' '){e.preventDefault();if(it&&!isOn(s,it.id)) send({type:'take',itemId:it.id});else go(Math.min(s.ro.length-1,s.roIdx+1))}
+  if(e.key===' '){e.preventDefault();if(it&&!isOn(s,it.id)) send({type:'take',itemId:it.id});else if(!pageMove(1)) go(Math.min(s.ro.length-1,s.roIdx+1))}
   else if(e.key==='Escape'){if($('.menu')) closeMenus();else if(it) send({type:'clear',itemId:it.id})}
-  else if(e.key==='ArrowRight') go(Math.min(s.ro.length-1,s.roIdx+1));
-  else if(e.key==='ArrowLeft') go(Math.max(0,s.roIdx-1));
+  else if(e.key==='ArrowRight'){if(!pageMove(1)) go(Math.min(s.ro.length-1,s.roIdx+1))}
+  else if(e.key==='ArrowLeft'){if(!pageMove(-1)) go(Math.max(0,s.roIdx-1))}
   else if(/^[1-9]$/.test(e.key)) go(+e.key-1);
 });
 

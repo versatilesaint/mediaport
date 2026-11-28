@@ -259,7 +259,7 @@ export function sample(t,org){
       const role=nm.replace(/ – .*| Name| Lower Third| Identification| ID$/g,'');
       return {name:PEOPLE[t.n%PEOPLE.length],title:role,dept:org.depts[(t.n)%Math.max(1,org.depts.length)]||''};
     }
-    case 'lyrics':return {song:'Amazing Grace · John Newton (public domain)',line1:'Amazing grace! how sweet the sound,',line2:'That saved a wretch like me!',line3:'I once was lost, but now am found,'};
+    case 'lyrics':return {song:'Amazing Grace · John Newton (public domain)',text:'',per:t.slot==='fullscreen'?4:2,line1:'Amazing grace! how sweet the sound,',line2:'That saved a wretch like me!',line3:'I once was lost, but now am found,'};
     case 'scripture':return {ref:'John 3:16',tr:'KJV',text:JN316,reader:'Sis. Funmi Adeyemi'};
     case 'title':return /Song/.test(nm)?{kicker:'Now singing',title:'Amazing Grace',sub:'John Newton'}:/Theme/.test(nm)?{kicker:nm,title:'Arise and Shine',sub:'Isaiah 60:1'}:{kicker:/Topic/.test(nm)?'Bible study':'Sermon',title:'Light for the Nations',sub:'Walking in the light · Part 3'};
     case 'points':return {heading:/Prayer/.test(nm)?'Prayer points':'Three marks of a light-bearer',points:'Shine where you stand\nCarry the Word daily\nStay connected to the source',reveal:3};
@@ -278,7 +278,7 @@ export function sample(t,org){
     case 'ticker':return {label:'NEWS',text:'Midweek service Wednesday 19:00  •  Youth night Friday 18:30  •  Prayer line open daily  •  More at '+org.web};
     case 'bar':return {left:/Motto/.test(nm)?(org.motto||'Add your motto in Settings'):/Copyright/.test(nm)?'Amazing Grace — Public domain':/Now Playing/.test(nm)?'Now playing · Amazing Grace':org.name,right:/Copyright/.test(nm)?'CCLI licence: set in Settings':org.loc};
     case 'badge':return {label:/LIVE NOW/.test(nm)?'LIVE NOW':/LIVE/.test(nm)?'LIVE':/On-Air/.test(nm)?'ON AIR':/Status/.test(nm)?'Starting soon':/YouTube/.test(nm)?'YouTube':/Facebook/.test(nm)?'Facebook':/Online/.test(nm)?'Online service':/QR/.test(nm)?'Scan to give':/Department/.test(nm)?(org.depts[1]||'Department'):'Badge'};
-    case 'countdown':return {label:/Pre-Service|Service/.test(nm)?'Service starts in':nm.replace(' Countdown','')+' in',minutes:/Conference/.test(nm)?90:10};
+    case 'countdown':return {label:/Pre-Service|Service/.test(nm)?'Service starts in':nm.replace(' Countdown','')+' in',minutes:/Conference/.test(nm)?90:10,at:'',weekly:''};
     case 'timer':return {label:'Speaker timer'};
     case 'clock':return {};
     case 'frame':return {label:/Interview/.test(nm)?'Interview':/Guest Video/.test(nm)?'Guest on call':'Main camera'};
@@ -290,6 +290,7 @@ export function sample(t,org){
   return {};
 }
 export function defTargets(t){
+  if(/Emergency/.test(t.name)) return {obs:true,freeshow:true,stage:true};
   if(t.cat===14||t.cat===16||[116,117,118,120].includes(t.n)||t.comp==='stage') return {obs:false,freeshow:false,stage:true};
   if(t.comp==='frame'||t.comp==='logo'&&t.slot==='watermark') return {obs:true,freeshow:false,stage:false};
   if(t.comp==='scripture'||t.comp==='lyrics') return {obs:true,freeshow:true,stage:true};
@@ -297,7 +298,7 @@ export function defTargets(t){
 }
 export const FIELDS={
  lowerThird:[['name','Name'],['title','Title or role'],['dept','Department']],
- lyrics:[['song','Song'],['line1','Line 1'],['line2','Line 2'],['line3','Line 3 (three-line layouts)']],
+ lyrics:[['song','Song'],['text','Whole song: paste it, one line per line, a blank line between verses. Next / Prev page through it.','ta'],['per','Lines per page (1 to 4)','num'],['line1','Line 1 (if no song is pasted)'],['line2','Line 2'],['line3','Line 3 (three-line layouts)']],
  scripture:[['ref','Reference'],['tr','Translation'],['text','Verse text','ta']],
  title:[['kicker','Small heading'],['title','Title'],['sub','Subtitle']],
  points:[['heading','Heading'],['points','Points (one per line)','ta'],['reveal','Show how many','num']],
@@ -307,7 +308,7 @@ export const FIELDS={
  ticker:[['label','Label'],['text','Items (separate with •)','ta']],
  bar:[['left','Left'],['right','Right']],
  badge:[['label','Label']],
- countdown:[['label','Label'],['minutes','Minutes from Take','num']],
+ countdown:[['label','Label'],['minutes','Minutes from Show','num'],['at','Or count down to a time: 18:00 (today) or 2026-12-24 18:00'],['weekly','Or the next service in a weekly schedule: Sun 10:30, Wed 19:00']],
  timer:[['label','Label']],clock:[],frame:[['label','Camera label']],background:[['caption','Caption (optional)']],
  transition:[['title','Title']],stage:[['current','Current'],['next','Next']],logo:[]
 };
@@ -318,6 +319,38 @@ export const PACKS={
  conference:{name:'Conference',desc:'Sessions, speakers, panels, breaks',svc:'Conference · Day 1',plan:[[114,'09:00','30m'],[51,'09:30','5m'],[31,'09:35','2m'],[48,'09:37','1m'],[218,'09:38','40m'],[53,'10:20','1m'],[163,'10:50','20m'],[191,'11:10','—'],[58,'11:15','5m'],[162,'11:20','1m']],cur:3},
  general:{name:'General organisation',desc:'Talks, announcements, timers',svc:'Main Event',plan:[[110,'18:00','15m'],[51,'18:15','5m'],[57,'18:20','1m'],[221,'18:21','20m'],[40,'18:41','2m'],[58,'18:45','5m'],[191,'18:50','—'],[102,'18:50','—']],cur:2}
 };
+
+
+// ---------- Phase 2: paging, fitting, countdown targets, emergency ----------
+const words=t=>String(t??'').replace(/\s+/g,' ').trim().split(' ').filter(Boolean);
+/** Splits text into pages of at most `max` characters, breaking between words. */
+export function chunk(text,max){const out=[];let cur='';for(const w of words(text)){if(cur&&(cur+' '+w).length>max){out.push(cur);cur=w}else cur=cur?cur+' '+w:w}if(cur) out.push(cur);return out.length?out:['']}
+/** The pages a graphic steps through with Next / Prev: lyric lines or Scripture text. Each page is an array of lines. */
+export function pagesOf(it,d){d=d||it.live||it.data||{};
+  if(it.comp==='lyrics'){const per=Math.min(4,Math.max(1,Number(d.per)||(it.slot==='fullscreen'?4:2)));const verses=String(d.text||'').split(/\n\s*\n/).map(v=>v.split('\n').map(x=>x.trim()).filter(Boolean)).filter(v=>v.length);
+    if(!verses.length) return [[d.line1,d.line2,...(T(it.n).n===15?[d.line3]:[])].filter(x=>x!=null&&x!=='')];
+    const pg=[];for(const v of verses) for(let i=0;i<v.length;i+=per) pg.push(v.slice(i,i+per));return pg}
+  if(it.comp==='scripture'){return chunk(d.text,it.slot==='fullscreen'?380:170).map(x=>[x])}
+  return [[]]}
+export const pageIdx=(it,d)=>{const n=pagesOf(it,d).length;return Math.min(n-1,Math.max(0,Number((d||it.live||{}).page)||0))};
+const pgTag=(it,d)=>{const n=pagesOf(it,d).length;return n>1?`<span class="pg">${pageIdx(it,d)+1} / ${n}</span>`:''};
+/** Shrinks text until it fits its box (binary search on font size). Elements opt in with data-fit (min px in data-min). */
+export function fit(root){for(const el of root.querySelectorAll('[data-fit]')){el.style.fontSize='';const max=parseFloat(getComputedStyle(el).fontSize)||40,min=+el.dataset.min||22;
+  const over=()=>el.scrollHeight>el.clientHeight+1||el.scrollWidth>el.clientWidth+1;if(!over()) continue;let lo=min,hi=max;for(let i=0;i<9;i++){const m=(lo+hi)/2;el.style.fontSize=m+'px';if(over()) hi=m;else lo=m}el.style.fontSize=lo+'px'}}
+/** Epoch ms for a wall-clock time in an IANA time zone (handles clock changes). */
+export function zonedEpoch(y,mo,d,h,mi,tz){let t=Date.UTC(y,mo-1,d,h,mi);for(let i=0;i<3;i++){const p=Object.fromEntries(new Intl.DateTimeFormat('en-GB',{timeZone:tz,hourCycle:'h23',year:'numeric',month:'2-digit',day:'2-digit',hour:'2-digit',minute:'2-digit'}).formatToParts(new Date(t)).map(x=>[x.type,x.value]));
+  const asUtc=Date.UTC(+p.year,+p.month-1,+p.day,+p.hour,+p.minute);t+=Date.UTC(y,mo-1,d,h,mi)-asUtc}return t}
+const DAYS=['sun','mon','tue','wed','thu','fri','sat'];
+function wallNow(tz,now){const p=Object.fromEntries(new Intl.DateTimeFormat('en-GB',{timeZone:tz,hourCycle:'h23',year:'numeric',month:'2-digit',day:'2-digit',weekday:'short'}).formatToParts(new Date(now)).map(x=>[x.type,x.value]));return {y:+p.year,m:+p.month,d:+p.day,dow:DAYS.indexOf(p.weekday.toLowerCase().slice(0,3))}}
+/** When a countdown ends: a set time ("18:00" today/tomorrow, or "2026-12-24 18:00"), the next weekly service ("Sun 10:30, Wed 19:00"), or minutes from Show. */
+export function countdownTarget(d,tz,now){tz=tz||'Europe/London';const at=String(d.at||'').trim(),wk=String(d.weekly||'').trim();
+  let m=at.match(/^(\d{4})-(\d{2})-(\d{2})[ T](\d{1,2}):(\d{2})$/);if(m) return zonedEpoch(+m[1],+m[2],+m[3],+m[4],+m[5],tz);
+  m=at.match(/^(\d{1,2}):(\d{2})$/);if(m){const w=wallNow(tz,now);let t=zonedEpoch(w.y,w.m,w.d,+m[1],+m[2],tz);if(t<=now) t+=86400000;return t}
+  if(wk){let best=Infinity;const w=wallNow(tz,now);for(const part of wk.split(',')){const q=part.trim().toLowerCase().match(/^([a-z]{3})[a-z]*\s+(\d{1,2}):(\d{2})$/);if(!q) continue;const dow=DAYS.indexOf(q[1]);if(dow<0) continue;
+    for(let add=0;add<=7;add++){const base=new Date(Date.UTC(w.y,w.m-1,w.d+add));if(base.getUTCDay()!==dow) continue;const t=zonedEpoch(base.getUTCFullYear(),base.getUTCMonth()+1,base.getUTCDate(),+q[2],+q[3],tz);if(t>now&&t<best) best=t}}if(best<Infinity) return best}
+  return now+(Number(d.minutes)||10)*60000}
+/** Emergency notices pre-empt everything and are only removed by Hide / Clear (studio spec §4, #18). */
+export const isEmergency=n=>/Emergency/.test(T(n)?.name||'');
 
 export const MULTI={badge:3,banner:2};
 
@@ -351,12 +384,13 @@ export function G(it,d,out,idx,org,st){
   const t=T(it.n),c=it.comp,full=it.slot==='fullscreen';
   const sw='<div class="sweep"></div>';
   switch(c){
-    case 'lowerThird': return ['lt',`<div class="slab"><div class="mk">${logoUrl(org)?`<img src="${esc(logoUrl(org))}" alt="">`:esc(org.mk)}</div><div class="tx">${sw}<div class="nm ts">${esc(d.name)}</div><div class="ti">${esc(d.title)}</div>${d.dept?`<div class="dp">${esc(d.dept)}</div>`:''}</div></div>`];
-    case 'lyrics': if(full) return ['full',`<div class="kk">${esc(t.n===4?'Hymn · Stanza 1':d.song)}</div><div class="verse" style="text-align:center;align-self:center">${esc(d.line1)}<br>${esc(d.line2)}</div>`];
-      return ['lyl',`<div class="box">${sw}<p class="hi">${esc(d.line1)}</p><p>${esc(d.line2)}</p>${t.n===15?`<p>${esc(d.line3)}</p>`:''}</div>`];
-    case 'scripture': if(full) return ['full',`<div class="kk">${esc(d.ref)} · ${esc(d.tr)}${t.n===19&&d.reader?' · Read by '+esc(d.reader):''}</div><div class="verse">${esc(d.text)}</div>`];
+    case 'lowerThird': return ['lt',`<div class="slab" style="max-width:1500px"><div class="mk">${logoUrl(org)?`<img src="${esc(logoUrl(org))}" alt="">`:esc(org.mk)}</div><div class="tx">${sw}<div class="nm ts" data-fit data-min="30" style="max-width:1150px;white-space:nowrap;overflow:hidden">${esc(d.name)}</div><div class="ti">${esc(d.title)}</div>${d.dept?`<div class="dp">${esc(d.dept)}</div>`:''}</div></div>`];
+    case 'lyrics':{const pg=pagesOf(it,d)[pageIdx(it,d)]||[];
+      if(full) return ['full',`<div class="kk">${esc(t.n===4?'Hymn':d.song)}${pgTag(it,d)}</div><div class="verse" data-fit data-min="34" style="text-align:center;align-self:center;max-height:640px;overflow:hidden">${pg.map(esc).join('<br>')}</div>`];
+      return ['lyl',`<div class="box" data-fit data-min="26" style="max-height:${t.n===15?250:190}px">${sw}${pg.map((l,i)=>`<p${i?'':' class="hi"'}>${esc(l)}</p>`).join('')}${pgTag(it,d)}</div>`];}
+    case 'scripture': if(full) return ['full',`<div class="kk">${esc(d.ref)} · ${esc(d.tr)}${t.n===19&&d.reader?' · Read by '+esc(d.reader):''}${pgTag(it,d)}</div><div class="verse" data-fit data-min="34" style="max-height:640px;overflow:hidden;font-family:var(--f-scripture,inherit)">${esc((pagesOf(it,d)[pageIdx(it,d)]||[''])[0])}</div>`];
       if(t.n===18||t.n===39) return ['scl" style="right:auto',`<div class="box">${sw}<div class="rf" style="font-size:40px">${esc(d.ref)}</div></div>`];
-      return ['scl',`<div class="box">${sw}<div class="rf">${esc(d.ref)} · ${esc(d.tr)}</div><div class="vt ts" style="font-family:var(--f-scripture,inherit)">${esc(d.text)}</div></div>`];
+      return ['scl',`<div class="box">${sw}<div class="rf">${esc(d.ref)} · ${esc(d.tr)}${pgTag(it,d)}</div><div class="vt ts" data-fit data-min="24" style="font-family:var(--f-scripture,inherit);max-height:170px;overflow:hidden">${esc((pagesOf(it,d)[pageIdx(it,d)]||[''])[0])}</div></div>`];
     case 'title': if(full) return ['full',`<div class="kk">${esc(d.kicker)}</div><h1>${esc(d.title)}</h1><div class="bd">${esc(d.sub)}</div>`];
       return ['ttl',`<div class="box">${sw}<div class="kk">${esc(d.kicker)}</div><h2>${esc(d.title)}</h2>${d.sub?`<div class="sb">${esc(d.sub)}</div>`:''}</div>`];
     case 'points':{const ps=String(d.points||'').split('\n').filter(Boolean);const rv=+d.reveal||ps.length;
@@ -387,7 +421,7 @@ export function reconcile(cv,list){
   const have=new Map([...cv.querySelectorAll(':scope>[data-k]')].map(e=>[e.dataset.k,e]));
   list.forEach(g=>{let el=have.get(g.k);
     if(el&&el.dataset.sig!==g.sig){el.remove();el=null}
-    if(!el){el=document.createElement('div');el.dataset.k=g.k;el.dataset.sig=g.sig;el.className='g '+g.cls.split('"')[0];const st=(g.cls.split('style="')[1]||'').replace(/"$/,'');el.setAttribute('style',st+';z-index:'+g.z);el.innerHTML=g.html;cv.appendChild(el)}
+    if(!el){el=document.createElement('div');el.dataset.k=g.k;el.dataset.sig=g.sig;el.className='g '+g.cls.split('"')[0];const st=(g.cls.split('style="')[1]||'').replace(/"$/,'');el.setAttribute('style',st+';z-index:'+g.z);el.innerHTML=g.html;cv.appendChild(el);fit(el)}
     else{el.style.zIndex=g.z;have.delete(g.k)}
   });
   have.forEach(el=>{if(el.classList.contains('out')) return;el.classList.add('out');setTimeout(()=>el.remove(),360)});
@@ -395,6 +429,6 @@ export function reconcile(cv,list){
 export function listFor(st,o,org,useDraft){
   const its=st.onAir[o].map(id=>st.items[id]).filter(Boolean).sort((a,b)=>(SLOTZ[a.slot]-SLOTZ[b.slot]));const cnt={};
   return its.map(it=>{const i=cnt[it.slot]=(cnt[it.slot]??-1)+1;const d=it.live;const [cls,html]=G(it,d,o,i,org,st);
-    const z=(it.n===183?59:SLOTZ[it.slot]);return {k:it.id,cls,html,z,sig:cls+'|'+html.length+'|'+JSON.stringify(d).length+'|'+hash(html)}});
+    const z=(isEmergency(it.n)?61:it.n===183?59:SLOTZ[it.slot]);return {k:it.id,cls,html,z,sig:cls+'|'+html.length+'|'+JSON.stringify(d).length+'|'+hash(html)}});
 }
 export function hash(s){let h=0;for(let i=0;i<s.length;i++)h=(h*31+s.charCodeAt(i))|0;return h}

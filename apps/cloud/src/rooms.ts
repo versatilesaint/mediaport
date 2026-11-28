@@ -79,7 +79,7 @@ export function kitsBody(orgs: OrgRow[] | null) {
 // ---------------------------------------------------------------- Help
 export function helpBody() {
   return `${roomHead('help', 'Help', 'How to use MediaPort', 'Short guides for the media team. Start at the top if you are new.')}
-<ul class="toc"><li><a href="#start">Getting started</a></li><li><a href="#invites">Invites and roles</a></li><li><a href="#screens">Screen links</a></li><li><a href="#obs">OBS</a></li><li><a href="#freeshow">FreeShow</a></li><li><a href="#studio">The studio</a></li><li><a href="#timer">Speaker timer</a></li><li><a href="#keys">Keyboard</a></li><li><a href="#trouble">When something goes wrong</a></li></ul>
+<ul class="toc"><li><a href="#start">Getting started</a></li><li><a href="#invites">Invites and roles</a></li><li><a href="#screens">Screen links</a></li><li><a href="#obs">OBS</a></li><li><a href="#freeshow">FreeShow</a></li><li><a href="#studio">The studio</a></li><li><a href="#paging">Songs and pages</a></li><li><a href="#countdowns">Countdowns</a></li><li><a href="#emergency">Emergency</a></li><li><a href="#timer">Speaker timer</a></li><li><a href="#keys">Keyboard</a></li><li><a href="#trouble">When something goes wrong</a></li></ul>
 
 <h2 id="start">Getting started</h2>
 <ol class="steps">
@@ -122,6 +122,15 @@ export function helpBody() {
 <h2 id="studio">The studio</h2>
 <p>The studio is a desktop of windows: the <b>template library</b> (search by name or number), the <b>editor</b>, the <b>running order</b>, the <b>speaker timer</b> and live previews of each screen. Each graphic has its own switches for OBS, FreeShow and Stage, so the stream and the projector can show different things.</p>
 
+<h2 id="paging">Songs, Scripture and pages</h2>
+<p>Paste a whole song into a lyrics template (one line per line, a blank line between verses) and choose how many lines show at once. Long Bible passages split into pages by themselves. While a song or passage is on screen, <b>Next</b> and <b>Prev</b> (or the arrow keys) move through its pages; at the last page, Next moves on in the running order. A small "2 / 5" shows which page is up. Long text always shrinks to fit its box.</p>
+
+<h2 id="countdowns">Countdowns</h2>
+<p>A countdown can run for a number of minutes from Show, to a set time (<code>18:00</code> today, or <code>2026-12-24 18:00</code>), or to the next service in a weekly schedule (<code>Sun 10:30, Wed 19:00</code>). Times use your organisation's time zone, including clock changes.</p>
+
+<h2 id="emergency">Emergency notices</h2>
+<p>The Emergency Notice (#183) goes to every screen and stays on top. Other graphics never push it off; only Hide or Clear removes it.</p>
+
 <h2 id="timer">Speaker timer</h2>
 <p>Set the length, warnings (5, 2 and 1 minutes) and a grace period. Every screen shows the same second. After zero the timer shows the grace period, then counts up in overtime.</p>
 
@@ -130,7 +139,7 @@ export function helpBody() {
 <tr><th>Keys</th><th>Does</th></tr>
 <tr><td><b>Ctrl/⌘ K</b></td><td>Search templates and actions; type a number to jump to a template</td></tr>
 <tr><td><b>Space</b></td><td>Show or hide the selected graphic</td></tr>
-<tr><td><b>← / →</b></td><td>Previous / next in the running order</td></tr>
+<tr><td><b>← / →</b></td><td>Previous / next page of the song or passage on screen, then the running order</td></tr>
 <tr><td><b>Esc</b></td><td>Hide</td></tr>
 </table></div>
 
