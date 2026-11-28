@@ -352,3 +352,11 @@ body.lite .win{background:var(--surf2)}
   .dock .sep{display:none}
   .take{flex:1}
 }
+
+/* website rooms in the studio's menu bar */
+.menubar a.logo{text-decoration:none;color:inherit}
+.site-rooms{display:flex;gap:2px;margin-left:8px}
+.site-rooms a{display:inline-flex;align-items:center;min-height:36px;padding:0 10px;border-radius:9px;text-decoration:none;color:inherit;opacity:.75;font-weight:600;font-size:13px}
+.site-rooms a:hover{opacity:1;background:rgba(127,127,127,.15)}
+.site-rooms a[aria-current=page]{opacity:1;background:rgba(127,127,127,.22)}
+@media (max-width:1100px){.site-rooms{display:none}}

@@ -222,4 +222,21 @@ export class OrgScope {
   async audit(userId: string | null, action: string, detail?: string) {
     await Platform.audit(this.db, userId, action, detail, this.id);
   }
+
+  /** This organisation's audit trail (team, links, brand), newest first. */
+  async auditLog(limit = 1000) {
+    const r = await this.db
+      .prepare('SELECT a.at, a.action, a.detail, u.email FROM audit a LEFT JOIN users u ON u.id = a.user_id WHERE a.org_id = ? ORDER BY a.at DESC LIMIT ?')
+      .bind(this.id, limit)
+      .all<{ at: number; action: string; detail: string | null; email: string | null }>();
+    return r.results ?? [];
+  }
+
+  /** Merges keys into this organisation's settings JSON (only this organisation's row). Returns the new settings. */
+  async updateSettings(patch: Record<string, unknown>): Promise<OrgSettings> {
+    const next = { ...(this.org.settings as unknown as Record<string, unknown>), ...patch } as unknown as OrgSettings;
+    await this.db.prepare('UPDATE orgs SET settings = ? WHERE id = ?').bind(JSON.stringify(next), this.id).run();
+    (this.org as { settings: OrgSettings }).settings = next;
+    return next;
+  }
 }

@@ -13,7 +13,9 @@ const OUT_IDS: OutputId[] = ['obs', 'freeshow', 'stage'];
 
 export interface OrgProfile {
   slug: string; name: string; short: string; mk: string; loc: string; motto: string; web: string;
-  depts: string[]; lead: [string, string]; brand: Record<'p' | 'd' | 'a' | 'f' | 'm' | 'l', string>; pack: string; svc: string;
+  depts: string[]; lead: [string, string]; brand: Record<'p' | 'd' | 'a' | 'f' | 'm' | 'l' | 'sl' | 'tl' | 'lv', string>; pack: string; svc: string;
+  /** Brand Profile v2: fonts, look, motion, Scripture version, CCLI, logo URLs (studio spec §2) */
+  kit?: { fonts: { heading: string; body: string; scripture: string }; theme: string; motion: string; scripture: string; ccli: string; logos: Record<string, string> };
 }
 interface Item {
   id: string; n: number; comp: string; slot: string;
@@ -26,6 +28,8 @@ export interface State {
   v: 1; seeded: boolean; items: Record<string, Item>; onAir: Record<OutputId, string[]>;
   ro: { id: string; time: string; dur: string }[]; roIdx: number; timer: Timer; timerItem: string;
   outputs: Record<OutputId, OutputCfg>; log: { t: number; msg: string; by: string }[]; autoOut: { id: string; at: number }[]; updatedAt: number;
+  /** monotonic version: screens ignore an older snapshot that arrives late (studio spec §1) */
+  rev?: number;
 }
 interface Attachment { role: 'display' | 'control'; output?: OutputId; userId?: string; email?: string; roleName?: Role }
 
@@ -77,6 +81,7 @@ export class OverlayRoom extends DurableObject<Env> {
     const [client, server] = [pair[0], pair[1]];
     this.ctx.acceptWebSocket(server, [role]);
     server.serializeAttachment(att);
+    if (att.role === 'display' && att.output) await this.markSeen(att.output, true);
     this.sendTo(server, { v: 1, type: 'hello', role, output: att.output, serverTime: Date.now() });
     this.sendTo(server, this.snapshotFor(att, st));
     this.presence();
@@ -112,8 +117,8 @@ export class OverlayRoom extends DurableObject<Env> {
     for (const id of ids) if (st.items[id]) items[id] = st.items[id]!;
     if (st.timerItem && st.items[st.timerItem]) items[st.timerItem] = st.items[st.timerItem]!;
     return {
-      v: 1, type: 'snapshot', profile: this.profile ? { brand: this.profile.brand, mk: this.profile.mk, short: this.profile.short, name: this.profile.name, loc: this.profile.loc } : null,
-      state: { v: 1, items, onAir: { [o]: ids }, timer: st.timer, timerItem: st.timerItem, outputs: { [o]: st.outputs[o] }, updatedAt: st.updatedAt },
+      v: 1, type: 'snapshot', profile: this.profile ? { brand: this.profile.brand, mk: this.profile.mk, short: this.profile.short, name: this.profile.name, loc: this.profile.loc, kit: this.profile.kit } : null,
+      state: { v: 1, rev: st.rev ?? 0, items, onAir: { [o]: ids }, timer: st.timer, timerItem: st.timerItem, outputs: { [o]: st.outputs[o] }, updatedAt: st.updatedAt },
     };
   }
   private sendTo(ws: WebSocket, m: unknown) {
@@ -140,7 +145,49 @@ export class OverlayRoom extends DurableObject<Env> {
   private async save() {
     const st = this.st!;
     st.updatedAt = Date.now();
+    st.rev = (st.rev ?? 0) + 1;
     await this.ctx.storage.put('state', st);
+  }
+
+  // ---------- Screens: last connected (studio spec §7) ----------
+  private seen: Record<string, number> | null = null;
+  private async markSeen(out: OutputId, force = false) {
+    if (!this.seen) this.seen = (await this.ctx.storage.get<Record<string, number>>('seen')) ?? {};
+    const t = Date.now();
+    if (!force && t - (this.seen[out] ?? 0) < 60_000) return; // write at most once a minute per screen
+    this.seen[out] = t;
+    await this.ctx.storage.put('seen', this.seen);
+  }
+  /** For the screen-links panel: how many of each screen are connected now, and when each was last seen. */
+  async displayStatus() {
+    if (!this.seen) this.seen = (await this.ctx.storage.get<Record<string, number>>('seen')) ?? {};
+    const live: Record<string, number> = { obs: 0, freeshow: 0, stage: 0 };
+    for (const ws of this.ctx.getWebSockets()) {
+      const a = ws.deserializeAttachment() as Attachment;
+      if (a.role === 'display' && a.output) live[a.output] = (live[a.output] ?? 0) + 1;
+    }
+    return Object.fromEntries(OUT_IDS.map((o) => [o, { connected: live[o] ?? 0, lastSeen: live[o] ? Date.now() : this.seen![o] ?? 0 }]));
+  }
+  /** On-air activity for the log page and CSV export. */
+  async activity() {
+    const st = await this.load();
+    return st.log;
+  }
+
+  // ---------- Rate limit for control operations (studio spec §10): 40 at once, then 10 a second ----------
+  private buckets = new WeakMap<WebSocket, { tokens: number; at: number; warned: number }>();
+  private allow(ws: WebSocket): boolean {
+    const now = Date.now();
+    const b = this.buckets.get(ws) ?? { tokens: 40, at: now, warned: 0 };
+    b.tokens = Math.min(40, b.tokens + ((now - b.at) / 1000) * 10);
+    b.at = now;
+    this.buckets.set(ws, b);
+    if (b.tokens < 1) {
+      if (now - b.warned > 2000) { b.warned = now; this.sendTo(ws, { v: 1, type: 'error', code: 'rate_limited', message: 'Too many changes at once. Wait a moment.' }); }
+      return false;
+    }
+    b.tokens -= 1;
+    return true;
   }
 
   // ---------- Program operations ----------
@@ -206,8 +253,12 @@ export class OverlayRoom extends DurableObject<Env> {
     } catch {
       return this.sendTo(ws, { v: 1, type: 'error', code: 'bad_json', message: 'Message was not valid JSON.' });
     }
-    if (m.type === 'ping') return this.sendTo(ws, { v: 1, type: 'pong', t: Number(m.t) || 0, serverTime: Date.now() });
+    if (m.type === 'ping') {
+      if (att.role === 'display' && att.output) await this.markSeen(att.output);
+      return this.sendTo(ws, { v: 1, type: 'pong', t: Number(m.t) || 0, serverTime: Date.now() });
+    }
     if (att.role !== 'control') return this.sendTo(ws, { v: 1, type: 'error', code: 'read_only', message: 'This connection is display-only.' });
+    if (!this.allow(ws)) return;
 
     const role = att.roleName || 'viewer';
     const by = att.email || 'someone';
@@ -314,6 +365,8 @@ export class OverlayRoom extends DurableObject<Env> {
   }
 
   async webSocketClose(ws: WebSocket, code: number) {
+    const a = ws.deserializeAttachment() as Attachment;
+    if (a.role === 'display' && a.output) await this.markSeen(a.output, true);
     try { ws.close(code === 1005 ? 1000 : code); } catch { /* already closed */ }
     this.presence();
   }
@@ -322,7 +375,11 @@ export class OverlayRoom extends DurableObject<Env> {
   async disconnect(filter: { output?: string; all?: boolean }) {
     for (const ws of this.ctx.getWebSockets()) {
       const a = ws.deserializeAttachment() as Attachment;
-      if (filter.all || (a.role === 'display' && a.output === filter.output)) ws.close(4001, 'Access changed');
+      if (filter.all || (a.role === 'display' && a.output === filter.output)) {
+        // Say so first: a close frame alone isn't always delivered through proxies, and the screen must know.
+        this.sendTo(ws, { v: 1, type: 'access_changed' });
+        ws.close(4001, 'Access changed');
+      }
     }
   }
 

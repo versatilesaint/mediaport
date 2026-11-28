@@ -104,7 +104,9 @@ test('rotating a display key invalidates the old link', async () => {
 
 test('non-owners cannot use the platform area; the platform owner cannot read org content', async () => {
   assert.equal((await req(alice, '/api/platform/orgs')).status, 403);
-  assert.equal((await req(alice, '/platform')).status, 403);
+  const room = await req(alice, '/platform');
+  assert.equal(room.status, 200, 'members see the Platform room');
+  assert.ok(!(await room.text()).includes('Add an organisation'), 'but not the platform-owner tools');
   assert.equal((await req(owner, `/api/orgs/${A}/members`)).status, 403);
 });
 

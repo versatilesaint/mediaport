@@ -1,0 +1,197 @@
+<!doctype html>
+<meta charset="utf-8"><style data-dc-design-system-vars>@layer{:root{--port-orange:#e8552b;--harbour-ink:#0f1e2e;--cream:#f7f4ef;--signal-teal:#167f74;--surface-100:#f7f4ef;--surface-200:#ffffff;--ink:#0f1e2e;--muted:#5b6774;--hairline:#e3ded6;--space-2:8px;--space-3:12px;--space-4:16px;--space-6:24px;--radius-sm:8px;--radius-md:12px;--radius-mark:28px;--font-sans:Inter, system-ui, -apple-system, "Segoe UI", sans-serif;--text-display:700 48px/52px var(--font-sans);--text-h1:700 32px/38px var(--font-sans);--text-h2:600 24px/30px var(--font-sans);--text-body:400 16px/24px var(--font-sans);--text-small:400 14px/20px var(--font-sans);--text-label:600 12px/16px var(--font-sans);}}</style>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<title>MediaPort landing header</title>
+<script src="./_runtime/react.js"></script>
+<script src="./_runtime/react-dom.js"></script>
+<script src="./_runtime/support.js"></script>
+</head>
+<body>
+<x-dc>
+<helmet>
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700;800&amp;display=swap" rel="stylesheet">
+<style>
+body{margin:0;background:#0f1e2e}
+a{color:#f7f4ef}a:hover{color:#ef6a42}
+@keyframes mp-spin{from{transform:rotateY(0deg)}to{transform:rotateY(-360deg)}}
+@keyframes mp-float{0%,100%{transform:translateY(-8px)}50%{transform:translateY(8px)}}
+@keyframes mp-pulse{0%,100%{opacity:1}50%{opacity:.35}}
+.mp-ring{transform-style:preserve-3d;animation:mp-spin linear infinite}
+.mp-float{transform-style:preserve-3d;animation:mp-float 6s ease-in-out infinite}
+.mp-stage:hover .mp-ring{animation-play-state:paused}
+.mp-paused .mp-ring,.mp-paused .mp-float,.mp-paused .mp-dot{animation-play-state:paused}
+.mp-dot{animation:mp-pulse 1.6s ease-in-out infinite}
+.mp-card{transition:transform .35s ease, box-shadow .35s ease}
+.mp-card:hover{box-shadow:0 0 0 2px #ef6a42}
+@media (prefers-reduced-motion: reduce){.mp-ring,.mp-float,.mp-dot{animation:none}}
+</style>
+</helmet>
+<div style="min-height: 780px; background: #0f1e2e; color: #f7f4ef; font-family: Inter, system-ui, sans-serif; overflow: hidden; position: relative">
+  <div aria-hidden="true" style="position: absolute; inset: 0; background-image: radial-gradient(rgba(247,244,239,0.07) 1px, transparent 1px); background-size: 24px 24px; pointer-events: none"></div>
+
+  <header style="position: relative; max-width: 1280px; margin: 0 auto; padding: 24px 40px; display: flex; flex-wrap: wrap; align-items: center; justify-content: space-between; gap: 16px">
+    <a href="#top" aria-label="MediaPort home" style="display: flex; align-items: center"><img src="./assets/59e380ab15072920d8721cbcfb8b6af1.svg" alt="MediaPort" style="height: 40px; width: auto; display: block"></a>
+    <nav aria-label="Main" style="display: flex; flex-wrap: wrap; align-items: center; gap: 28px; font-size: 15px; font-weight: 500">
+      <a href="#platform" style="text-decoration: none">Platform</a>
+      <a href="#how" style="text-decoration: none">How it works</a>
+      <a href="#teams" style="text-decoration: none">For teams</a>
+      <a href="#help" style="text-decoration: none">Help</a>
+    </nav>
+    <div style="display: flex; align-items: center; gap: 12px">
+      <a href="https://mediaport.koladelawal.org/platform" style="text-decoration: none; font-size: 15px; font-weight: 600; padding: 12px 18px; border-radius: 12px; border: 1px solid #26394d; min-height: 44px; box-sizing: border-box; display: inline-flex; align-items: center">Sign in</a>
+      <a href="https://mediaport.koladelawal.org/platform" style="text-decoration: none; font-size: 15px; font-weight: 700; padding: 12px 20px; border-radius: 12px; background: {{accent}}; color: #0f1e2e; min-height: 44px; box-sizing: border-box; display: inline-flex; align-items: center">Get started</a>
+    </div>
+  </header>
+
+  <section id="top" style="position: relative; max-width: 1280px; margin: 0 auto; padding: 24px 40px 64px; display: flex; flex-wrap: wrap; align-items: center; gap: 32px">
+    <div style="flex: 1 1 440px; min-width: 0; display: flex; flex-direction: column; gap: 24px">
+      <div style="display: inline-flex; align-self: flex-start; align-items: center; gap: 8px; padding: 6px 12px; border-radius: 999px; border: 1px solid #26394d; font-size: 12px; font-weight: 600; letter-spacing: 0.06em; color: #a9b4c0">
+        <span class="mp-dot" style="width: 8px; height: 8px; border-radius: 50%; background: {{accent}}; display: inline-block"></span>
+        MEDIA PLATFORM
+      </div>
+      <h1 style="margin: 0; font-size: clamp(40px, 5.4vw, 72px); line-height: 1.02; font-weight: 800; letter-spacing: -0.03em">Every clip, stream and slide.<br><span style="color: {{accent}}">One port.</span></h1>
+      <p style="margin: 0; max-width: 500px; font-size: 18px; line-height: 28px; color: #a9b4c0">MediaPort brings your media team's uploads, livestreams, slides and graphics into one place — so Sunday's service, and everything after it, runs from a single dashboard.</p>
+      <div style="display: flex; flex-wrap: wrap; gap: 12px; padding-top: 8px">
+        <a href="https://mediaport.koladelawal.org/platform" style="text-decoration: none; font-size: 16px; font-weight: 700; padding: 16px 26px; border-radius: 12px; background: {{accent}}; color: #0f1e2e; display: inline-flex; align-items: center; gap: 10px; min-height: 52px; box-sizing: border-box">Open the platform
+          <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.4" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M5 12h14M13 6l6 6-6 6"></path></svg>
+        </a>
+        <button type="button" onClick="{{toggleMotion}}" aria-pressed="{{pausedAria}}" style="font: inherit; font-size: 16px; font-weight: 600; padding: 16px 22px; border-radius: 12px; background: transparent; color: #f7f4ef; border: 1px solid #26394d; cursor: pointer; display: inline-flex; align-items: center; gap: 10px; min-height: 52px">
+          <sc-if value="{{paused}}" hint-placeholder-val="{{ false }}">
+            <svg width="16" height="16" viewBox="0 0 24 24" fill="currentColor" aria-hidden="true"><path d="M7 4.5v15l12-7.5z"></path></svg>
+            Play motion
+          </sc-if>
+          <sc-if value="{{playing}}" hint-placeholder-val="{{ true }}">
+            <svg width="16" height="16" viewBox="0 0 24 24" fill="currentColor" aria-hidden="true"><rect x="6" y="4.5" width="4" height="15" rx="1"></rect><rect x="14" y="4.5" width="4" height="15" rx="1"></rect></svg>
+            Pause motion
+          </sc-if>
+        </button>
+      </div>
+      <div style="display: flex; flex-wrap: wrap; gap: 24px; padding-top: 8px; font-size: 14px; color: #a9b4c0">
+        <span style="display: inline-flex; align-items: center; gap: 8px"><svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="#2bb5a5" stroke-width="2.4" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M5 12.5l4.5 4.5L19 7.5"></path></svg>Invite-only team access</span>
+        <span style="display: inline-flex; align-items: center; gap: 8px"><svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="#2bb5a5" stroke-width="2.4" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M5 12.5l4.5 4.5L19 7.5"></path></svg>Sign in with Google</span>
+      </div>
+    </div>
+
+    <div class="mp-stage {{pausedClass}}" onPointerMove="{{onMove}}" onPointerLeave="{{onLeave}}" role="img" aria-label="The MediaPort MP logo in 3D, with video, livestream, audio, slides, photo and caption cards orbiting around it" style="flex: 1 1 520px; min-width: 0; height: 600px; position: relative; perspective: 1400px; display: flex; align-items: center; justify-content: center; cursor: grab">
+      <div style="position: relative; width: 1px; height: 1px; transform-style: preserve-3d; transition: transform .25s ease-out; transform: {{sceneTransform}}">
+
+        <div aria-hidden="true" style="position: absolute; left: -300px; top: 150px; width: 600px; height: 600px; transform: rotateX(90deg); transform-origin: center top; border-radius: 50%; border: 1px solid #26394d; box-shadow: inset 0 0 0 60px rgba(38,57,77,0.18), inset 0 0 0 120px rgba(38,57,77,0.12)"></div>
+
+        <div class="mp-float" style="position: absolute; left: 0; top: 0">
+          <sc-for list="{{layers}}" as="layer" hint-placeholder-count="14">
+            <svg viewBox="14 24 92 72" width="300" height="235" aria-hidden="true" style="{{layer.style}}">
+              <g transform="translate(-1.5 -1)" fill="none" stroke-width="14" stroke-linecap="round" stroke-linejoin="round">
+                <path d="M24 86V34l22 28 22-28v52" stroke="{{layer.letter}}"></path>
+                <path d="M68 34h12a17 17 0 0 1 0 34H68" stroke="{{layer.bowl}}"></path>
+                <path d="M77.5 44.5v13l10-6.5z" fill="{{layer.play}}" stroke="{{layer.play}}" stroke-width="1.5"></path>
+              </g>
+            </svg>
+          </sc-for>
+        </div>
+
+        <div style="position: absolute; left: 0; top: 0; transform-style: preserve-3d; transform: rotateX(-8deg) rotateZ(-6deg)">
+          <div class="mp-ring" style="position: absolute; left: 0; top: 0; animation-duration: {{orbitDur}}">
+            <sc-for list="{{cards}}" as="card" hint-placeholder-count="6">
+              <div class="mp-card" style="{{card.style}}">
+                <div style="width: 44px; height: 44px; border-radius: 12px; background: {{card.chip}}; display: flex; align-items: center; justify-content: center; flex: none">
+                  <sc-if value="{{card.isVideo}}" hint-placeholder-val="{{ false }}"><svg width="22" height="22" viewBox="0 0 24 24" fill="none" stroke="#0f1e2e" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><rect x="3" y="6" width="13" height="12" rx="2"></rect><path d="M16 10l5-3v10l-5-3"></path></svg></sc-if>
+                  <sc-if value="{{card.isLive}}" hint-placeholder-val="{{ false }}"><svg width="22" height="22" viewBox="0 0 24 24" fill="none" stroke="#0f1e2e" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><circle cx="12" cy="12" r="2.5"></circle><path d="M7.8 7.8a6 6 0 0 0 0 8.4M16.2 7.8a6 6 0 0 1 0 8.4M5 5a10 10 0 0 0 0 14M19 5a10 10 0 0 1 0 14"></path></svg></sc-if>
+                  <sc-if value="{{card.isAudio}}" hint-placeholder-val="{{ false }}"><svg width="22" height="22" viewBox="0 0 24 24" fill="none" stroke="#0f1e2e" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M4 10v4M8 7v10M12 4v16M16 8v8M20 11v2"></path></svg></sc-if>
+                  <sc-if value="{{card.isSlides}}" hint-placeholder-val="{{ false }}"><svg width="22" height="22" viewBox="0 0 24 24" fill="none" stroke="#0f1e2e" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><rect x="3" y="4" width="18" height="12" rx="2"></rect><path d="M12 16v4M8 20h8"></path></svg></sc-if>
+                  <sc-if value="{{card.isPhoto}}" hint-placeholder-val="{{ false }}"><svg width="22" height="22" viewBox="0 0 24 24" fill="none" stroke="#0f1e2e" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><rect x="3" y="5" width="18" height="14" rx="2"></rect><circle cx="9" cy="10" r="1.6"></circle><path d="M21 16l-5-5-9 8"></path></svg></sc-if>
+                  <sc-if value="{{card.isCaption}}" hint-placeholder-val="{{ false }}"><svg width="22" height="22" viewBox="0 0 24 24" fill="none" stroke="#0f1e2e" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><rect x="3" y="5" width="18" height="14" rx="2"></rect><path d="M7 11h4M7 15h7M14 11h3"></path></svg></sc-if>
+                </div>
+                <div style="display: flex; flex-direction: column; gap: 2px; min-width: 0">
+                  <span style="font-size: 15px; font-weight: 700; color: #f7f4ef">{{card.title}}</span>
+                  <span style="font-size: 12px; color: #a9b4c0">{{card.meta}}</span>
+                </div>
+              </div>
+            </sc-for>
+          </div>
+        </div>
+
+      </div>
+      <p style="position: absolute; bottom: 8px; left: 0; right: 0; margin: 0; text-align: center; font-size: 12px; color: #a9b4c0">Move your pointer to tilt · hover to pause the orbit</p>
+    </div>
+  </section>
+</div>
+</x-dc>
+<script type="text/x-dc" data-dc-script data-props='{"accent":{"editor":"color","default":"#e8552b","options":["#e8552b","#2bb5a5","#f7f4ef"],"section":"Look"},"orbitSeconds":{"editor":"range","default":28,"min":8,"max":60,"step":1,"unit":"s","section":"Motion"},"depth":{"editor":"range","default":14,"min":4,"max":24,"step":1,"section":"Motion"},"$preview":{"width":1440,"height":780}}'>
+class Component extends DCLogic {
+  constructor(props) {
+    super(props);
+    this.state = { rx: -6, ry: -18, paused: false };
+    this._raf = 0;
+    this._next = null;
+  }
+  componentWillUnmount() { if (this._raf) cancelAnimationFrame(this._raf); }
+  queue(rx, ry) {
+    this._next = { rx: rx, ry: ry };
+    if (this._raf) return;
+    this._raf = requestAnimationFrame(() => {
+      this._raf = 0;
+      if (this._next) this.setState(this._next);
+    });
+  }
+  renderVals() {
+    const accent = this.props.accent ?? '#e8552b';
+    const depth = Math.max(4, Math.min(24, this.props.depth ?? 14));
+    const secs = this.props.orbitSeconds ?? 28;
+    const layers = [];
+    for (let i = depth - 1; i >= 0; i--) {
+      const front = i === 0;
+      const shade = 0.55 + 0.35 * (1 - i / depth);
+      const mix = (hex) => {
+        const n = parseInt(hex.slice(1), 16);
+        const r = Math.round(((n >> 16) & 255) * shade), g = Math.round(((n >> 8) & 255) * shade), b = Math.round((n & 255) * shade);
+        return 'rgb(' + r + ',' + g + ',' + b + ')';
+      };
+      layers.push({
+        style: 'position:absolute;left:-150px;top:-118px;overflow:visible;transform:translateZ(' + (-i * 2.2) + 'px)',
+        letter: front ? '#f7f4ef' : mix('#f7f4ef'),
+        bowl: front ? accent : mix(accent),
+        play: front ? '#f7f4ef' : mix('#f7f4ef')
+      });
+    }
+    const defs = [
+      { kind: 'Video', title: 'Sermon clip', meta: '1080p · 3:42', chip: accent },
+      { kind: 'Live', title: 'Livestream', meta: 'YouTube · ready', chip: '#2bb5a5' },
+      { kind: 'Audio', title: 'Worship audio', meta: 'WAV · 48 kHz', chip: '#f7f4ef' },
+      { kind: 'Slides', title: 'Service slides', meta: '24 slides', chip: accent },
+      { kind: 'Photo', title: 'Event photos', meta: '128 images', chip: '#2bb5a5' },
+      { kind: 'Caption', title: 'Captions', meta: 'Auto · English', chip: '#f7f4ef' }
+    ];
+    const n = defs.length, radius = 290;
+    const cards = defs.map((d, i) => ({
+      title: d.title, meta: d.meta, chip: d.chip,
+      isVideo: d.kind === 'Video', isLive: d.kind === 'Live', isAudio: d.kind === 'Audio',
+      isSlides: d.kind === 'Slides', isPhoto: d.kind === 'Photo', isCaption: d.kind === 'Caption',
+      style: 'position:absolute;left:-104px;top:-34px;width:208px;box-sizing:border-box;padding:12px;border-radius:16px;background:rgba(23,42,62,0.92);border:1px solid #26394d;display:flex;align-items:center;gap:12px;transform:rotateY(' + (i * 360 / n) + 'deg) translateZ(' + radius + 'px) translateY(' + (i % 2 ? 70 : -70) + 'px)'
+    }));
+    return {
+      accent: accent,
+      layers: layers,
+      cards: cards,
+      orbitDur: secs + 's',
+      paused: this.state.paused,
+      playing: !this.state.paused,
+      pausedAria: this.state.paused ? 'true' : 'false',
+      pausedClass: this.state.paused ? 'mp-paused' : '',
+      sceneTransform: 'rotateX(' + this.state.rx + 'deg) rotateY(' + this.state.ry + 'deg)',
+      toggleMotion: () => this.setState({ paused: !this.state.paused }),
+      onMove: (e) => {
+        const r = e.currentTarget.getBoundingClientRect();
+        const x = (e.clientX - r.left) / r.width - 0.5;
+        const y = (e.clientY - r.top) / r.height - 0.5;
+        this.queue(-6 - y * 24, -18 + x * 50);
+      },
+      onLeave: () => this.queue(-6, -18)
+    };
+  }
+}
+</script>
+</body>
+</html>

@@ -14,4 +14,4 @@ PID=$!
 # Kill the whole process group: wrangler starts workerd as a child.
 trap 'kill -- -$PID 2>/dev/null || true' EXIT
 for i in $(seq 1 60); do curl -sf "http://127.0.0.1:$PORT/healthz" >/dev/null && break; sleep 0.5; done
-BASE="http://127.0.0.1:$PORT" node --test ../../tests/*.test.mjs
+BASE="http://127.0.0.1:$PORT" node --test --test-concurrency=1 ../../tests/*.test.mjs

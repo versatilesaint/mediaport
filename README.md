@@ -4,6 +4,10 @@ Live broadcast graphics for churches and organisations: 227 overlay templates fo
 
 Live: https://mediaport.koladelawal.org
 
+## Website rooms
+`/` Home (3D landing) · `/control` your studio · `/platform` sign in, organisations, team, screen links, brand · `/kits` broadcast kits · `/help` · `/guidelines`.
+Studio spec: `docs/MEDIAPORT_STUDIO_BUILD.md`; audit and progress: `docs/STUDIO_AUDIT.md` (Phase 1 done).
+
 ## Status: Phase 1a in progress
 - Control room (MediaPort OS) at `/{org}/control`: 227-template library, editor, running order, speaker timer, live OBS / FreeShow / Stage previews, 30 shell themes.
 - Every change goes through the organisation's room and reaches all screens live; displays keep the last picture through network loss.

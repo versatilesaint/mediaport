@@ -6,8 +6,12 @@ import type { Env } from './env';
 import { Invites, OrgScope, Platform, Users, type Org, type User } from './db';
 import { accessOk, currentUser, devSignIn, googleCallback, googleConfigured, googleStart, isPlatformOwnerEmail, safeNext, signOut } from './auth';
 import { randomToken } from './crypto';
-import { controlPage, displayPage, freeshowTestPage, homePage, message, platformPage, shellPage, signInPage } from './pages';
-import { cleanBrand, DEFAULT_BRAND, orgProfile } from './profile';
+import { controlPage, displayPage, freeshowTestPage, html, message, page, platformPage, shellPage, signInPage } from './pages';
+import { landingBody, sitePage } from './site';
+import { controlRoomBody, guidelinesBody, helpBody, kitsBody, platformMember, platformSignedOut } from './rooms';
+import { cleanBrand, DEFAULT_BRAND, orgProfile, storedKit } from './profile';
+import { cleanColors, cleanKit, contrastWarnings, LOGO_VARIANTS, type LogoVariant } from '../../../packages/core/src/brand';
+import { checkLogo } from './logo';
 
 export { OverlayRoom } from './room';
 import { ASSETS } from './generated/assets';
@@ -74,6 +78,10 @@ async function platformGuard(req: Request, env: Env, user: User | null): Promise
 
 const room = (env: Env, org: Org) => env.ROOM.get(env.ROOM.idFromName(org.id));
 
+const FAVICONS = new Set(['/favicon.ico', '/favicon.svg', '/favicon-16x16.png', '/favicon-32x32.png', '/apple-touch-icon.png', '/android-chrome-192x192.png', '/android-chrome-512x512.png', '/site.webmanifest']);
+/** The landing page runs one script file and no inline script. */
+const SITE_CSP = "default-src 'self'; script-src 'self'; style-src 'self' 'unsafe-inline'; img-src 'self' data:; font-src 'self'; connect-src 'self'; frame-ancestors 'self'; base-uri 'none'; form-action 'self' https://accounts.google.com";
+
 export default {
   async fetch(req: Request, env: Env): Promise<Response> {
     const url = new URL(req.url);
@@ -85,10 +93,20 @@ export default {
     // ----- Public and auth -----
     if (url.pathname === '/healthz') return json({ ok: true });
     if (url.pathname.startsWith('/assets/')) return serveAsset(req, url.pathname);
-    if (url.pathname === '/') {
-      const orgs = user ? await Users.orgsFor(env.DB, user.id) : [];
-      return homePage(user, orgs, !!user && isPlatformOwnerEmail(env, user.email));
+    // ----- The website's rooms: Home, Control, Platform, Kits, Help, Guidelines -----
+    if (url.pathname === '/') return html(sitePage({ title: 'MediaPort · every clip, stream and slide', room: 'home', user, landing: true, body: landingBody(!!user), scriptSrc: '/assets/landing.js' }), 200, { 'content-security-policy': SITE_CSP });
+    if (FAVICONS.has(url.pathname)) return serveAsset(req, '/assets/brand' + url.pathname);
+    if (url.pathname === '/control') {
+      if (!user) return Response.redirect(`${url.origin}/platform?next=/control`, 302);
+      const orgs = await Users.orgsFor(env.DB, user.id);
+      const active = orgs.filter((o) => o.status === 'active');
+      // One organisation: straight into its studio. Several: choose.
+      if (orgs.length === 1 && active.length === 1) return Response.redirect(`${url.origin}/${active[0]!.slug}/control`, 302);
+      return page('Control · MediaPort', controlRoomBody(orgs), { user, room: 'control' });
     }
+    if (url.pathname === '/kits') return page('Kits · MediaPort', kitsBody(user ? await Users.orgsFor(env.DB, user.id) : null), { user, room: 'kits' });
+    if (url.pathname === '/help') return page('Help · MediaPort', helpBody(), { user, room: 'help' });
+    if (url.pathname === '/guidelines') return page('Guidelines · MediaPort', guidelinesBody(), { user, room: 'guidelines' });
     if (url.pathname === '/auth/signin') return signInPage(safeNext(url.searchParams.get('next')), googleConfigured(env));
     if (url.pathname === '/auth/google/start') return googleConfigured(env) ? googleStart(req, env) : message('Sign-in not set up', 'Google sign-in has not been configured yet.', 503);
     if (url.pathname === '/auth/google/callback') return googleConfigured(env) ? googleCallback(req, env) : notFound();
@@ -112,13 +130,15 @@ export default {
       return Response.redirect(`${url.origin}/${org.slug}/control`, 302);
     }
 
-    // ----- Platform (owner only) -----
-    if (parts[0] === 'platform') {
-      if (!user) return Response.redirect(`${url.origin}/auth/signin?next=/platform`, 302);
-      const denied = await platformGuard(req, env, user);
-      if (denied) return message('Platform owner only', 'This area is for the MediaPort platform owner.', 403, user);
-      return platformPage(user);
+    // ----- Platform room: sign in, your organisations; the platform owner also adds organisations -----
+    if (parts[0] === 'platform' && parts.length === 1) {
+      if (!user) return page('Platform · MediaPort', platformSignedOut(googleConfigured(env), safeNext(url.searchParams.get('next') || '/platform')), { room: 'platform' });
+      const orgs = await Users.orgsFor(env.DB, user.id);
+      const owner = isPlatformOwnerEmail(env, user.email) && (await accessOk(req, env));
+      if (owner) return platformPage(user, platformMember(user, orgs, true));
+      return page('Platform · MediaPort', platformMember(user, orgs, false), { user, room: 'platform' });
     }
+    if (parts[0] === 'platform') return notFound();
     if (parts[0] === 'api' && parts[1] === 'platform') {
       const denied = await platformGuard(req, env, user);
       if (denied) return denied;
@@ -223,10 +243,59 @@ export default {
         await scope.audit(user!.id, 'invite.created', b.role);
         return json({ url: `${url.origin}/invite/${token}` }, 201);
       }
+      // ----- Brand Profile v2 (admin) -----
+      if (sub === 'brand' && req.method === 'GET') {
+        const p = orgProfile(scope.org);
+        return json({ colors: p.brand, kit: storedKit(scope.org), logos: p.kit?.logos ?? {}, warnings: contrastWarnings(p.brand as never), profile: p });
+      }
+      if (sub === 'brand' && req.method === 'PUT') {
+        const b = await body<{ colors?: unknown; kit?: unknown }>(req);
+        const colors = cleanColors(b.colors);
+        if (!colors) return fail(400, 'Every colour must be a hex colour like #1a2b3c.');
+        const kit = { ...cleanKit(b.kit, storedKit(scope.org)), logos: storedKit(scope.org).logos };
+        await scope.updateSettings({ brand: colors, kit });
+        await scope.audit(user!.id, 'brand.updated');
+        await room(env, scope.org).setProfile(orgProfile(scope.org));
+        return json({ ok: true, warnings: contrastWarnings(colors) });
+      }
+      if (parts[3] === 'brand' && parts[4] === 'logo' && parts.length === 6) {
+        const variant = parts[5] as LogoVariant;
+        if (!(LOGO_VARIANTS as readonly string[]).includes(variant)) return fail(400, 'Unknown logo variant.');
+        const kit = storedKit(scope.org);
+        if (req.method === 'DELETE') {
+          if (kit.logos[variant]) await env.MEDIA.delete(`orgs/${scope.org.id}/brand/${variant}-${kit.logos[variant]}`);
+          delete kit.logos[variant];
+        } else if (req.method === 'POST') {
+          const checked = checkLogo(req.headers.get('content-type') || '', new Uint8Array(await req.arrayBuffer()));
+          if ('error' in checked) return fail(400, checked.error);
+          const file = `${Date.now().toString(36)}.${checked.ext}`;
+          await env.MEDIA.put(`orgs/${scope.org.id}/brand/${variant}-${file}`, checked.bytes, { httpMetadata: { contentType: checked.type } });
+          if (kit.logos[variant]) await env.MEDIA.delete(`orgs/${scope.org.id}/brand/${variant}-${kit.logos[variant]}`);
+          kit.logos[variant] = file;
+        } else return notFound();
+        await scope.updateSettings({ kit });
+        await scope.audit(user!.id, req.method === 'DELETE' ? 'brand.logo_removed' : 'brand.logo_uploaded', variant);
+        await room(env, scope.org).setProfile(orgProfile(scope.org));
+        return json({ ok: true, logos: orgProfile(scope.org).kit?.logos ?? {} });
+      }
       if (sub === 'display-links' && req.method === 'GET') {
         const keys = await scope.displayKeys();
         const links = Object.fromEntries(OUTPUTS.map((o) => [o, `${url.origin}/${scope.org.slug}/o/${o}?k=${keys[o]}`]));
-        return json({ links });
+        return json({ links, status: await room(env, scope.org).displayStatus() });
+      }
+      // ----- Activity: on-air log (room) + team/link/brand changes (audit), filter and CSV export -----
+      if ((sub === 'activity' || sub === 'activity.csv') && req.method === 'GET') {
+        const q = (url.searchParams.get('q') || '').toLowerCase().slice(0, 80);
+        const since = Date.now() - Math.min(365, Math.max(1, Number(url.searchParams.get('days')) || 30)) * 86_400_000;
+        const onAir = ((await room(env, scope.org).activity()) as { t: number; msg: string; by: string }[]).map((e) => ({ at: e.t, kind: 'on air', what: e.msg, who: e.by }));
+        const admin = (await scope.auditLog()).map((e) => ({ at: e.at, kind: 'admin', what: e.action + (e.detail ? ' · ' + e.detail : ''), who: e.email || 'MediaPort' }));
+        const rows = [...onAir, ...admin].filter((r) => r.at >= since && (!q || (r.what + ' ' + r.who).toLowerCase().includes(q))).sort((a, b) => b.at - a.at);
+        if (sub === 'activity') return json({ rows, tz: scope.org.tz });
+        const fmt = new Intl.DateTimeFormat('en-GB', { timeZone: scope.org.tz, dateStyle: 'short', timeStyle: 'medium' });
+        // Spreadsheet-safe CSV: quote every cell; neutralise leading = + - @ (formula injection).
+        const cell = (v: string) => '"' + v.replace(/^[=+\-@\t\r]/, "'$&").replace(/"/g, '""') + '"';
+        const csv = ['Time (' + scope.org.tz + ')', 'Type', 'What', 'Who'].map(cell).join(',') + '\r\n' + rows.map((r) => [fmt.format(r.at), r.kind, r.what, r.who].map(cell).join(',')).join('\r\n');
+        return new Response(csv, { headers: { 'content-type': 'text/csv; charset=utf-8', 'content-disposition': `attachment; filename="${scope.org.slug}-activity.csv"`, 'cache-control': 'no-store', 'x-content-type-options': 'nosniff' } });
       }
       if (parts[3] === 'display-links' && parts[5] === 'rotate' && req.method === 'POST') {
         const out = parts[4];
@@ -251,6 +320,18 @@ export default {
         const key = url.searchParams.get('k') || '';
         if (org.status !== 'active' || !isOutput(out) || !(await scope.displayKeyValid(out, key))) return notFound();
         return displayPage({ slug: org.slug, output: out, key, profile: orgProfile(org), reduceMotion: url.searchParams.get('motion') === 'reduce' }, url.searchParams.get('debug') === '1');
+      }
+
+      // Organisation logos (public, like any logo on a broadcast). Locked down: no scripts, even in SVG.
+      if (parts[1] === 'logo' && parts.length === 3 && (LOGO_VARIANTS as readonly string[]).includes(parts[2]!)) {
+        if (org.status !== 'active') return notFound();
+        const file = storedKit(org).logos[parts[2] as LogoVariant];
+        const obj = file ? await env.MEDIA.get(`orgs/${org.id}/brand/${parts[2]}-${file}`) : null;
+        if (!obj) return notFound();
+        return new Response(obj.body, { headers: {
+          'content-type': obj.httpMetadata?.contentType || 'application/octet-stream', 'cache-control': 'public, max-age=31536000, immutable',
+          'x-content-type-options': 'nosniff', 'content-security-policy': "default-src 'none'; style-src 'unsafe-inline'; sandbox", 'cross-origin-resource-policy': 'same-origin',
+        } });
       }
 
       if (parts[1] === 'ws' && parts.length === 2) {

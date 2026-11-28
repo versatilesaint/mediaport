@@ -16,48 +16,12 @@ export function html(body: string, status = 200, extra: Record<string, string> =
   return new Response(body, { status, headers: { ...SECURITY_HEADERS, 'cache-control': 'no-store', ...extra } });
 }
 
-const BASE_CSS = `
-:root{--bg:#f6f4fb;--panel:#ffffff;--fg:#1a1430;--mut:#615a78;--line:rgba(26,20,48,.12);--acc:#6b21a8;--on-acc:#fff;--ok:#15803d;--bad:#b91c1c;color-scheme:light}
-@media (prefers-color-scheme:dark){:root{--bg:#0b0618;--panel:#160d2e;--fg:#f4efff;--mut:#a99cc8;--line:rgba(244,239,255,.14);--acc:#f7ba49;--on-acc:#1a1030;--ok:#4ade80;--bad:#f87171;color-scheme:dark}}
-*{box-sizing:border-box}
-body{margin:0;background:var(--bg);color:var(--fg);font:16px/1.5 system-ui,-apple-system,"Segoe UI",sans-serif}
-main{max-width:980px;margin:0 auto;padding:32px max(16px,env(safe-area-inset-left)) 64px}
-header.top{display:flex;align-items:center;gap:12px;padding:14px max(16px,env(safe-area-inset-left));border-bottom:1px solid var(--line);background:var(--panel)}
-header.top b{font-size:18px;letter-spacing:-.01em}
-header.top .sp{flex:1}
-h1{font-size:28px;margin:0 0 6px;text-wrap:balance}
-h2{font-size:19px;margin:28px 0 10px}
-.mut{color:var(--mut)}
-.card{background:var(--panel);border:1px solid var(--line);border-radius:14px;padding:18px}
-.grid{display:grid;gap:12px}
-.row{display:flex;gap:10px;flex-wrap:wrap;align-items:center}
-.btn{display:inline-flex;align-items:center;justify-content:center;min-height:44px;padding:0 16px;border-radius:10px;border:1px solid var(--line);background:var(--panel);color:var(--fg);font:600 15px system-ui,sans-serif;cursor:pointer;text-decoration:none}
-.btn.pri{background:var(--acc);color:var(--on-acc);border-color:transparent}
-.btn.danger{color:var(--bad)}
-.btn.sm{min-height:34px;padding:0 12px;font-size:13px}
-input,select{min-height:42px;padding:8px 12px;border-radius:10px;border:1px solid var(--line);background:transparent;color:var(--fg);font:inherit;width:100%}
-label{display:grid;gap:4px;font-size:13px;font-weight:600;color:var(--mut)}
-table{width:100%;border-collapse:collapse;font-size:14px}
-td,th{text-align:left;padding:9px 8px;border-bottom:1px solid var(--line);vertical-align:top}
-.tw{overflow-x:auto}
-code,.mono{font-family:ui-monospace,Consolas,monospace;font-size:13px;word-break:break-all}
-.pill{display:inline-block;padding:2px 9px;border-radius:999px;font-size:12px;font-weight:700;background:var(--line)}
-.err{color:var(--bad);font-weight:600}
-.ok{color:var(--ok);font-weight:600}
-:focus-visible{outline:2px solid var(--acc);outline-offset:2px}
-`;
+import { headLinks, sitePage, roomHead, type RoomId } from './site';
+import { platformSignedOut } from './rooms';
 
-export function page(title: string, body: string, opts: { user?: { email: string } | null; script?: string } = {}): Response {
-  const top = `<header class="top"><b>MediaPort</b><span class="sp"></span>${
-    opts.user
-      ? `<span class="mut" style="font-size:14px">${esc(opts.user.email)}</span><form method="post" action="/auth/signout" style="margin:0"><button class="btn sm">Sign out</button></form>`
-      : ''
-  }</header>`;
-  return html(
-    `<!doctype html><html lang="en-GB"><head><meta charset="utf-8"><meta name="viewport" content="width=device-width,initial-scale=1"><title>${esc(title)}</title><style>${BASE_CSS}</style></head><body>${top}<main>${body}</main>${
-      opts.script ? `<script>${opts.script}</script>` : ''
-    }</body></html>`,
-  );
+/** Every server-rendered page sits in the shared site frame (room bar, favicons, MediaPort tokens). */
+export function page(title: string, body: string, opts: { user?: { email: string } | null; script?: string; room?: RoomId | null; scriptSrc?: string; css?: string[] } = {}): Response {
+  return html(sitePage({ title, room: opts.room ?? null, user: opts.user, body, inlineScript: opts.script, scriptSrc: opts.scriptSrc, css: opts.css }));
 }
 
 export function message(title: string, text: string, status = 200, user?: { email: string } | null, action?: string) {
@@ -66,31 +30,7 @@ export function message(title: string, text: string, status = 200, user?: { emai
 }
 
 export function signInPage(next: string, googleReady: boolean) {
-  return page(
-    'Sign in · MediaPort',
-    `<div class="card" style="max-width:440px;margin:40px auto"><h1>Sign in</h1><p class="mut">Use the Google account your organisation invited.</p>${
-      googleReady
-        ? `<a class="btn pri" style="width:100%" href="/auth/google/start?next=${encodeURIComponent(next)}">Continue with Google</a>`
-        : `<p class="err">Google sign-in isn't set up yet. The platform owner needs to add the Google client ID and secret.</p>`
-    }<p class="mut" style="font-size:13px;margin-top:16px">Email codes arrive in a later update.</p></div>`,
-  );
-}
-
-export function homePage(user: { email: string } | null, orgs: { slug: string; name: string; role: string; status: string }[], isOwner: boolean) {
-  if (!user)
-    return page(
-      'MediaPort',
-      `<h1>MediaPort</h1><p class="mut">Live graphics for churches and organisations, for OBS, FreeShow and stage screens.</p><a class="btn pri" href="/auth/signin">Sign in</a>`,
-    );
-  const list = orgs.length
-    ? `<div class="grid">${orgs
-        .map(
-          (o) =>
-            `<a class="card" style="text-decoration:none;color:inherit;display:flex;justify-content:space-between;gap:12px" href="/${esc(o.slug)}/control"><span><b>${esc(o.name)}</b><br><span class="mut mono">/${esc(o.slug)}</span></span><span class="pill">${esc(o.role)}${o.status === 'suspended' ? ' · suspended' : ''}</span></a>`,
-        )
-        .join('')}</div>`
-    : `<p class="mut">You're not in any organisation yet. Ask its owner for an invite link.</p>`;
-  return page('MediaPort', `<h1>Your organisations</h1>${list}${isOwner ? `<p style="margin-top:24px"><a class="btn" href="/platform">Platform admin</a></p>` : ''}`, { user });
+  return page('Sign in · MediaPort', platformSignedOut(googleReady, next), { room: 'platform' });
 }
 
 export function controlPage(user: { email: string }, org: { slug: string; name: string }, role: string) {
@@ -102,30 +42,32 @@ const canAdmin=['owner','admin'].includes(ROLE);
 async function load(){
   const m=await api('/members');
   $('#members').innerHTML='<table><tr><th>Email</th><th>Role</th></tr>'+m.members.map(x=>'<tr><td>'+esc(x.email)+'</td><td>'+esc(x.role)+'</td></tr>').join('')+'</table>'+(m.invites&&m.invites.length?'<p class="mut" style="margin-top:12px">Waiting to accept: '+m.invites.map(i=>esc(i.email)+' ('+esc(i.role)+')').join(', ')+'</p>':'');
-  if(canAdmin){const d=await api('/display-links');$('#links').innerHTML=Object.entries(d.links).map(([o,u])=>'<div class="card" style="margin-bottom:10px"><div class="row" style="justify-content:space-between"><b>'+esc(o)+'</b><span class="row"><button class="btn sm" data-copy="'+esc(u)+'">Copy</button><button class="btn sm danger" data-rotate="'+esc(o)+'">Rotate key</button></span></div><div class="mono" style="margin-top:8px">'+esc(u)+'</div></div>').join('')}
 }
-document.addEventListener('click',async e=>{const c=e.target.closest('[data-copy]');if(c){try{await navigator.clipboard.writeText(c.dataset.copy);c.textContent='Copied'}catch{c.textContent='Select and copy'}}
- const r=e.target.closest('[data-rotate]');if(r){if(r.dataset.armed!=='1'){r.dataset.armed='1';r.textContent='Tap again: old link stops';return}await api('/display-links/'+r.dataset.rotate+'/rotate',{method:'POST'});load()}});
+
 const f=$('#invite');if(f) f.addEventListener('submit',async e=>{e.preventDefault();const out=$('#invout');out.className='';out.textContent='Creating…';
  try{const j=await api('/invites',{method:'POST',body:JSON.stringify({email:f.email.value,role:f.role.value})});out.className='ok';out.innerHTML='Invite link (valid 7 days, send it to them): <div class="mono" style="margin-top:6px">'+esc(j.url)+'</div>';f.reset();load()}catch(err){out.className='err';out.textContent=err.message}});
 load().catch(e=>{$('#members').textContent=e.message});`;
   return page(
     `${org.name} · MediaPort`,
-    `<p class="mut mono">/${esc(org.slug)}</p><h1>${esc(org.name)}</h1><p class="mut">You're signed in as <b>${esc(role)}</b>. <a href="/${esc(org.slug)}/control">Open the control room</a></p>
+    `${roomHead('platform', 'Platform · /' + org.slug, org.name, `You're signed in as <b>${esc(role)}</b>. <a href="/${esc(org.slug)}/control">Open the studio</a>`)}
     <h2>Team</h2><div class="card" id="members">Loading…</div>
     ${
       ['owner', 'admin'].includes(role)
         ? `<h2>Invite someone</h2><form class="card grid" id="invite" style="grid-template-columns:2fr 1fr auto;align-items:end"><label>Email<input name="email" type="email" required autocomplete="off"></label><label>Role<select name="role">${(role === 'owner' ? ['admin', 'producer', 'operator', 'viewer', 'owner'] : ['producer', 'operator', 'viewer'])
             .map((r) => `<option>${r}</option>`)
             .join('')}</select></label><button class="btn pri">Create invite</button></form><p id="invout"></p>
-      <h2>Display links</h2><p class="mut">Paste each link once: OBS Browser Source, FreeShow Website item, or any screen for Stage. Links are display-only.</p><div id="links">Loading…</div>`
+      <h2>Display links</h2><p class="mut">Paste each link once: OBS Browser Source, FreeShow Website item, or any screen for Stage. Links are display-only.</p><div id="links">Loading…</div>
+      <h2 id="activity">Activity</h2><p class="mut">What went on air, and changes to the team, links and brand. Times are in your organisation's time zone.</p>
+      <div class="card"><div class="row" style="margin-bottom:12px"><input id="actQ" type="search" placeholder="Filter (name, graphic, action)" style="flex:1;min-width:200px"><select id="actDays" style="width:auto"><option value="1">Today</option><option value="7">7 days</option><option value="30" selected>30 days</option><option value="365">A year</option></select><a class="btn sm" id="actCsv" href="#">Download CSV</a></div><div id="actList" class="tw">Loading…</div></div>
+      <h2 id="brand">Brand</h2><p class="mut">Your on-air look: colours, fonts, logos and the Bible version. Changes reach OBS, FreeShow and Stage straight away, without reloading them.</p>
+      <div id="brandEd" data-org="${esc(org.slug)}"><div class="card">Loading…</div></div>`
         : ''
     }`,
-    { user, script },
+    { user, script, room: 'platform', scriptSrc: ['owner', 'admin'].includes(role) ? '/assets/team.js' : undefined, css: ['owner', 'admin'].includes(role) ? ['/assets/graphics.css'] : undefined },
   );
 }
 
-export function platformPage(user: { email: string }) {
+export function platformPage(user: { email: string }, memberHtml = '') {
   const script = `
 const $=s=>document.querySelector(s);const esc=s=>String(s??'').replace(/[&<>"']/g,c=>({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#39;'}[c]));
 const api=(p,o={})=>fetch('/api/platform'+p,{...o,headers:{'content-type':'application/json'}}).then(async r=>{const j=await r.json().catch(()=>({}));if(!r.ok) throw new Error(j.error||r.statusText);return j});
@@ -143,8 +85,8 @@ document.addEventListener('click',async e=>{const out=$('#out');
 load().catch(e=>{$('#orgs').textContent=e.message});`;
   return page(
     'Platform · MediaPort',
-    `<h1>Platform admin</h1><p class="mut">Create and manage organisations. You see names and usage only, not an organisation's content.</p>
-    <h2>Organisations</h2>
+    `${memberHtml}<h2>Platform admin</h2><p class="mut">Create and manage organisations. You see names and usage only, not an organisation's content.</p>
+    <h2>All organisations</h2>
     <div class="row" style="margin-bottom:10px"><label style="flex:1;min-width:220px">Owner email (for "Invite owner")<input id="ownerEmail" type="email" autocomplete="off"></label><label style="flex:1;min-width:220px">Confirm delete (type the address)<input id="delConfirm" autocomplete="off"></label></div>
     <div class="card" id="orgs">Loading…</div><p id="out" role="status"></p>
     <h2>Add an organisation</h2>
@@ -159,7 +101,7 @@ load().catch(e=>{$('#orgs').textContent=e.message});`;
       <label>Owner email (optional)<input name="ownerEmail" type="email"></label>
       <div style="align-self:end"><button class="btn pri" style="width:100%">Create organisation</button></div>
     </form>`,
-    { user, script },
+    { user, script, room: 'platform' },
   );
 }
 
@@ -189,11 +131,12 @@ body.bo #cv{background:#000}body.bo #cv>*{display:none}
 /** The MediaPort OS control shell (brief §7.1). All data arrives over the room WebSocket after load. */
 export function shellPage(boot: unknown) {
   return html(
-    `<!doctype html><html lang="en-GB"><head><meta charset="utf-8"><meta name="viewport" content="width=device-width,initial-scale=1,viewport-fit=cover"><title>MediaPort</title>
+    `<!doctype html><html lang="en-GB"><head><meta charset="utf-8"><meta name="viewport" content="width=device-width,initial-scale=1,viewport-fit=cover"><title>MediaPort</title>${headLinks()}
 <link rel="stylesheet" href="/assets/graphics.css"><link rel="stylesheet" href="/assets/shell.css"></head><body>
 <div class="wall" aria-hidden="true"><div class="blob b1"></div><div class="blob b2"></div><div class="blob b3"></div><div class="dots"></div><div class="floor"></div><div class="wm">MediaPort</div></div>
 <header class="menubar">
-  <div class="logo"><span class="mk" aria-hidden="true"></span><span class="grad">MediaPort</span></div>
+  <a class="logo" href="/" title="MediaPort home"><span class="mk" aria-hidden="true"></span><span class="grad">MediaPort</span></a>
+  <nav class="site-rooms hide-sm" aria-label="Rooms"><a href="/">Home</a><a href="/control" aria-current="page">Control</a><a href="/platform">Platform</a><a href="/kits">Kits</a><a href="/help">Help</a><a href="/guidelines">Guidelines</a></nav>
   <button class="mb-btn" id="orgBtn" data-act="org-menu" aria-haspopup="true"><span id="orgName"></span><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M6 9l6 6 6-6"/></svg></button>
   <button class="mb-btn hide-sm" data-act="tile" title="Arrange windows"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8"><rect x="3" y="3" width="8" height="18" rx="1.5"/><rect x="13" y="3" width="8" height="8" rx="1.5"/><rect x="13" y="13" width="8" height="8" rx="1.5"/></svg><span class="hide-md">Arrange</span></button>
   <div class="mb-sp"></div>

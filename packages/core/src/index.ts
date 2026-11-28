@@ -20,7 +20,7 @@ export type StarterPack = (typeof STARTER_PACKS)[number];
 /** Organisation address slugs: 2–32 lowercase letters, digits or hyphens, not starting or ending with a hyphen. */
 export const SLUG_RE = /^[a-z0-9](?:[a-z0-9-]{0,30}[a-z0-9])$/;
 /** First path segments the platform uses itself; no organisation may take them. */
-export const RESERVED_SLUGS = ['platform', 'api', 'auth', 'invite', 'o', 'control', 'dock', 'hub', 'admin', 'static', 'assets', 'test', 'design', 'healthz'];
+export const RESERVED_SLUGS = ['platform', 'api', 'auth', 'invite', 'o', 'control', 'dock', 'hub', 'admin', 'static', 'assets', 'test', 'design', 'healthz', 'kits', 'help', 'guidelines', 'screen', 'studio'];
 
 export interface OrgSettings {
   location: string;
